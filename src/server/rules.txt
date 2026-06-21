@@ -1,0 +1,165 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // FUNCION AUXILIAR DE ROLES
+    // =========================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isGerente() {
+      return isSignedIn()
+        && getUserData().rol == "GERENTE";
+    }
+
+    function isLider() {
+      return isSignedIn()
+        && getUserData().rol == "LIDER";
+    }
+
+    function sameTienda(tiendaId) {
+      return getUserData().idTienda == tiendaId;
+    }
+
+    // =========================
+    // USUARIOS
+    // =========================
+    match /usuarios/{userId} {
+
+      // leer perfil propio o gerente de la tienda
+      allow read: if isSignedIn()
+        && (request.auth.uid == userId || isGerente());
+
+      // solo gerente puede crear usuarios (asignar personal)
+      allow create: if isGerente();
+
+      // gerente puede editar personal de su tienda
+      // usuario solo puede editar su propio perfil (limitado)
+      allow update: if isGerente()
+        || request.auth.uid == userId;
+
+      // solo gerente puede eliminar
+      allow delete: if isGerente();
+    }
+
+    // =========================
+    // TIENDAS
+    // =========================
+    match /tiendas/{tiendaId} {
+
+      allow read: if isSignedIn();
+
+      // solo GERENTE crea tiendas
+      allow create: if isGerente();
+
+      // solo GERENTE edita tiendas
+      allow update: if isGerente();
+
+      allow delete: if isGerente();
+    }
+
+    // =========================
+    // BODEGAS
+    // =========================
+    match /bodegas/{bodegaId} {
+
+      allow read: if isSignedIn()
+        && sameTienda(resource.data.idTienda);
+
+      allow create: if isGerente();
+
+      allow update: if isGerente();
+
+      allow delete: if isGerente();
+    }
+
+    // =========================
+    // PRODUCTOS
+    // =========================
+    match /productos/{productoId} {
+
+      allow read: if isSignedIn();
+
+      allow create: if isGerente();
+
+      allow update: if isGerente();
+
+      allow delete: if isGerente();
+    }
+
+    // =========================
+    // INVENTARIO ACTUAL
+    // =========================
+    match /inventario_actual/{docId} {
+
+      allow read: if isSignedIn();
+
+      // gerente y líder pueden actualizar inventario
+      allow create: if isSignedIn();
+
+      allow update: if isSignedIn();
+
+      // normalmente no se borra
+      allow delete: if isGerente();
+    }
+
+    // =========================
+    // INVENTARIOS (CABECERA)
+    // =========================
+    match /inventarios/{inventarioId} {
+
+      allow read: if isSignedIn();
+
+      // GERENTE o LÍDER pueden crear inventarios
+      allow create: if isSignedIn();
+
+      allow update: if isSignedIn();
+
+      allow delete: if isGerente();
+
+      // =========================
+      // DETALLE INVENTARIO
+      // =========================
+      match /detalle/{detalleId} {
+
+        allow read: if isSignedIn();
+
+        allow create: if isSignedIn();
+
+        allow update: if isSignedIn();
+
+        allow delete: if isGerente();
+      }
+    }
+
+    // =========================
+    // CONFIGURACIÓN DE ORDEN PERSONAL
+    // (cada usuario define su orden de inventario)
+    // =========================
+    match /configuracion_inventario_usuario/{configId} {
+
+      allow read: if isSignedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || isGerente()
+        );
+
+      allow create: if isSignedIn();
+
+      allow update: if isSignedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || isGerente()
+        );
+
+      allow delete: if isGerente();
+    }
+  }
+}

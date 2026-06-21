@@ -1,0 +1,155 @@
+.editar-personal {
+  width: 100%;
+  min-height: 100vh;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #eef2ff 0%, #dbeafe 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+.editar-card {
+  width: 100%;
+  max-width: 980px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.editar-card h2 {
+  margin: 0 0 0.75rem 0;
+  color: #1e293b;
+}
+
+.subtitle {
+  margin: 0 0 1.5rem;
+  color: #475569;
+}
+
+.editar-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 1.5rem;
+}
+
+.staff-list,
+.staff-form {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.staff-list h3,
+.staff-form h3 {
+  margin-top: 0;
+  color: #0f172a;
+}
+
+.staff-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.staff-list li {
+  padding: 1rem;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.staff-list li:hover {
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.staff-list li.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.staff-list li div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.staff-list li strong {
+  color: #0f172a;
+}
+
+.staff-list li span {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.staff-form label {
+  display: block;
+  margin: 1rem 0 0.5rem;
+  color: #334155;
+  font-weight: 600;
+}
+
+.staff-form input {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.staff-form input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.staff-form button {
+  margin-top: 1.25rem;
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.staff-form button:hover {
+  background: #1d4ed8;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+}
+
+.message.success {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #a7f3d0;
+}
+
+.message.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+@media (max-width: 900px) {
+  .editar-grid {
+    grid-template-columns: 1fr;
+  }
+}

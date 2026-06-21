@@ -1,0 +1,41 @@
+.mi-perfil {
+  padding: 28px;
+  min-height: calc(100vh - 80px);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #000);
+}
+
+.mi-perfil h2 {
+  margin-bottom: 16px;
+}
+
+.perfil-card {
+  max-width: 720px;
+  background: var(--color-bg, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.08));
+}
+
+.perfil-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed rgba(0,0,0,0.04);
+}
+
+.perfil-row:last-child {
+  border-bottom: none;
+}
+
+.perfil-key {
+  font-weight: 700;
+  color: var(--color-text-muted, #333);
+}
+
+.perfil-value {
+  color: var(--color-text, #000);
+  word-break: break-word;
+}
