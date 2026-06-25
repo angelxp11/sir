@@ -4,6 +4,9 @@ import Navbar from "../../resources/navbar/navbar";
 import MiPerfil from "../miperfil/miperfil";
 import MiTienda from "../mitienda/miTienda";
 import EditarPersonal from "../editarpersonal/editarpersonal";
+import TiposInventario from "../tiposinventarios/tiposinventario";
+import CrearInventario from "../crearinventario/crearinventario";
+import InventariosGuardados from "../inventariosguardados/inventariosguardados";
 import { useState } from "react";
 
 export default function HomePage({ onLogout, usuario }) {
@@ -58,6 +61,9 @@ export default function HomePage({ onLogout, usuario }) {
         {activeView === 'mi-perfil' && <MiPerfil usuario={usuario} />}
         {activeView === 'mi-tienda' && <MiTienda />}
         {activeView === 'editar-personal' && <EditarPersonal />}
+        {activeView === 'tipos-inventarios' && <TiposInventario />}
+        {activeView === 'crear-inventario' && <CrearInventario />}
+        {activeView === 'inventarios-guardados' && <InventariosGuardados />}
       </main>
     </div>
   );

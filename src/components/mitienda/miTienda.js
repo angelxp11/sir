@@ -6,12 +6,11 @@ import {
   editarTienda,
   obtenerInformacionUsuarioPorCorreo,
   obtenerInformacionUsuariosPorIds,
-  actualizarUsuario,
   agregarPersonalATienda,
   quitarPersonalDeTienda,
   asegurarRolGerente,
+  obtenerInformacionUsuarioPorUid,
 } from "../../server/funtions";
-import { obtenerInformacionUsuarioPorUid } from "../../server/funtions";
 import { auth } from "../../server/server";
 
 export default function MiTienda() {
@@ -67,22 +66,22 @@ export default function MiTienda() {
     try {
       // Normalize role in Firestore if the stored role differs only by capitalization
       const currentRol = (user.rol || user.role || '').toString().toUpperCase();
-      if (currentRol === 'GERENTE' && (user.rol !== 'GERENTE' && user.role !== 'GERENTE')) {
-        await asegurarRolGerente(user.id || user.uid);
-        // refresh user
-        const refreshed = await obtenerInformacionUsuarioPorUid(user.id || user.uid);
+      let currentUser = user;
+      if (currentRol === 'GERENTE' && (currentUser.rol !== 'GERENTE' && currentUser.role !== 'GERENTE')) {
+        await asegurarRolGerente(currentUser.id || currentUser.uid);
+        const refreshed = await obtenerInformacionUsuarioPorUid(currentUser.id || currentUser.uid);
         setUser(refreshed);
-        user = refreshed;
+        currentUser = refreshed;
       }
       if (tienda) {
         // sólo el gerente asociado puede editar
-        if (tienda.manager && tienda.manager !== (user.id || user.uid)) {
+        if (tienda.manager && tienda.manager !== (currentUser.id || currentUser.uid)) {
           alert('Sólo el gerente de esta tienda puede editarla.');
           return;
         }
         await editarTienda(tienda.id, { nombre });
       } else {
-        const id = await crearTienda(nombre, user.id);
+        const id = await crearTienda(nombre, currentUser.id);
         const t = await obtenerTiendaPorId(id);
         setTienda(t);
         const members = await obtenerInformacionUsuariosPorIds(t?.personal || []);
@@ -110,12 +109,13 @@ export default function MiTienda() {
     }
 
     try {
-      const currentRol = (user.rol || user.role || '').toString().toUpperCase();
-      if (currentRol === 'GERENTE' && (user.rol !== 'GERENTE' && user.role !== 'GERENTE')) {
-        await asegurarRolGerente(user.id || user.uid);
-        const refreshed = await obtenerInformacionUsuarioPorUid(user.id || user.uid);
+      let currentUser = user;
+      const currentRol = (currentUser.rol || currentUser.role || '').toString().toUpperCase();
+      if (currentRol === 'GERENTE' && (currentUser.rol !== 'GERENTE' && currentUser.role !== 'GERENTE')) {
+        await asegurarRolGerente(currentUser.id || currentUser.uid);
+        const refreshed = await obtenerInformacionUsuarioPorUid(currentUser.id || currentUser.uid);
         setUser(refreshed);
-        user = refreshed;
+        currentUser = refreshed;
       }
       const target = await obtenerInformacionUsuarioPorCorreo(staffEmail);
       if (!target) {
@@ -150,13 +150,14 @@ export default function MiTienda() {
     }
 
     try {
-        const currentRol = (user.rol || user.role || '').toString().toUpperCase();
-        if (currentRol === 'GERENTE' && (user.rol !== 'GERENTE' && user.role !== 'GERENTE')) {
-          await asegurarRolGerente(user.id || user.uid);
-          const refreshed = await obtenerInformacionUsuarioPorUid(user.id || user.uid);
-          setUser(refreshed);
-          user = refreshed;
-        }
+      let currentUser = user;
+      const currentRol = (currentUser.rol || currentUser.role || '').toString().toUpperCase();
+      if (currentRol === 'GERENTE' && (currentUser.rol !== 'GERENTE' && currentUser.role !== 'GERENTE')) {
+        await asegurarRolGerente(currentUser.id || currentUser.uid);
+        const refreshed = await obtenerInformacionUsuarioPorUid(currentUser.id || currentUser.uid);
+        setUser(refreshed);
+        currentUser = refreshed;
+      }
       await quitarPersonalDeTienda(tienda.id, uid);
       const t = await obtenerTiendaPorId(tienda.id);
       setTienda(t);

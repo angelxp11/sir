@@ -123,22 +123,40 @@ const Navbar = ({ onLogout, usuario, onNavigate }) => {
         <nav className="sidebar-nav">
           <ul className="sidebar-menu">
             <li className="sidebar-item">
-              <a href="#" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-perfil')}>
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-perfil')}>
                 <i className="ti ti-user"></i>
                 {!isCollapsed && <span>Mi Perfil</span>}
-              </a>
+              </button>
             </li>
             <li className="sidebar-item">
-              <a href="#" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-tienda')}>
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-tienda')}>
                 <i className="ti ti-building"></i>
                 {!isCollapsed && <span>Mi Tienda</span>}
-              </a>
+              </button>
             </li>
             <li className="sidebar-item">
-              <a href="#" className="sidebar-link" onClick={(e) => handleNav(e, 'editar-personal')}>
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'editar-personal')}>
                 <i className="ti ti-pencil"></i>
                 {!isCollapsed && <span>Editar Personal</span>}
-              </a>
+              </button>
+            </li>
+            <li className="sidebar-item">
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'tipos-inventarios')}>
+                <i className="ti ti-list"></i>
+                {!isCollapsed && <span>Tipos de inventarios</span>}
+              </button>
+            </li>
+            <li className="sidebar-item">
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'crear-inventario')}>
+                <i className="ti ti-plus"></i>
+                {!isCollapsed && <span>Crear inventario</span>}
+              </button>
+            </li>
+            <li className="sidebar-item">
+              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'inventarios-guardados')}>
+                <i className="ti ti-stack"></i>
+                {!isCollapsed && <span>Inventarios guardados</span>}
+              </button>
             </li>
           </ul>
         </nav>

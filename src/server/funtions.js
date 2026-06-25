@@ -194,4 +194,97 @@ export async function asegurarRolGerente(uid) {
     await updateDoc(ref, { rol: "GERENTE" });
   }
 }
+export async function crearTipoInventario(idTienda, nombre, categorias = []) {
+  if (!idTienda || !nombre) throw new Error("ID de tienda y nombre requeridos");
 
+  const data = {
+    tiendaId: idTienda,
+    nombre,
+    categorias,
+    fechaCreacion: new Date(),
+    activa: true,
+  };
+
+  const ref = await addDoc(collection(db, "tipos_inventario"), data);
+  return ref.id;
+}
+
+export async function obtenerTiposInventarioPorTienda(idTienda) {
+  if (!idTienda) return [];
+
+  const q = query(collection(db, "tipos_inventario"), where("tiendaId", "==", idTienda));
+  const snap = await getDocs(q);
+  return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+}
+
+export async function obtenerTipoInventarioPorId(idTipo) {
+  if (!idTipo) return null;
+  const snap = await getDoc(doc(db, "tipos_inventario", idTipo));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
+}
+
+export async function obtenerInventariosPorTienda(idTienda) {
+  if (!idTienda) return [];
+  const q = query(collection(db, "inventarios"), where("tiendaId", "==", idTienda));
+  const snap = await getDocs(q);
+  return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+}
+
+export async function obtenerInventarioPorId(idInventario) {
+  if (!idInventario) return null;
+  const snap = await getDoc(doc(db, "inventarios", idInventario));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
+}
+
+export async function crearInventarioDesdeTipo(tipoInventarioId, tiendaId, usuario, itemDetails = {}, nombreInventario = "") {
+  if (!tipoInventarioId || !tiendaId) throw new Error("Tipo de inventario y tienda son requeridos");
+
+  const usuarioNombre = usuario?.nombre || usuario?.displayName || usuario?.correo || "Inventario";
+  const nombreFinal = nombreInventario?.trim() || usuarioNombre;
+
+  const tipo = await obtenerTipoInventarioPorId(tipoInventarioId);
+  if (!tipo) throw new Error("Tipo de inventario no encontrado");
+
+  const categorias = (tipo.categorias || []).map((cat) => ({
+    nombre: cat.nombre,
+    items: (cat.items || []).map((item) => {
+      const key = `${cat.nombre}||${item.nombre}`;
+      const detail = itemDetails[key] || { bodega: "", linea: "" };
+      return {
+        nombre: item.nombre,
+        bodega: detail.bodega || "",
+        linea: detail.linea || "",
+      };
+    }),
+  }));
+
+  const inventario = {
+    tiendaId,
+    tipoInventarioId,
+    tipoInventarioNombre: tipo.nombre,
+    nombreInventario: nombreFinal,
+    fechaCreacion: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdByUid: usuario?.id || usuario?.uid || null,
+    createdByName: usuario?.nombre || usuario?.displayName || usuario?.correo || null,
+    updatedByUid: usuario?.id || usuario?.uid || null,
+    updatedByName: usuario?.nombre || usuario?.displayName || usuario?.correo || null,
+    estado: "ABIERTA",
+    categorias,
+    itemDetails,
+  };
+
+  const ref = await addDoc(collection(db, "inventarios"), inventario);
+  return ref.id;
+}
+
+export async function actualizarInventario(idInventario, data) {
+  if (!idInventario) throw new Error("ID de inventario requerido");
+  await updateDoc(doc(db, "inventarios", idInventario), {
+    ...data,
+    updatedAt: new Date(),
+  });
+}

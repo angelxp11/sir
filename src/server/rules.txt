@@ -66,6 +66,16 @@ service cloud.firestore {
     }
 
     // =========================
+    // TIPOS DE INVENTARIO
+    match /tipos_inventario/{tipoId} {
+
+      allow read: if isSignedIn();
+      allow create: if isGerente();
+      allow update: if isGerente();
+      allow delete: if isGerente();
+    }
+
+    // =========================
     // BODEGAS
     // =========================
     match /bodegas/{bodegaId} {
