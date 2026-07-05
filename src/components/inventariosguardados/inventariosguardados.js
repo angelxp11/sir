@@ -8,6 +8,7 @@ import {
   actualizarInventario,
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
+import { buildInventarioPayload } from "./inventariosguardadosUtils";
 
 const getKey = (categoriaNombre, itemNombre) => `${categoriaNombre}||${itemNombre}`;
 
@@ -57,33 +58,8 @@ function CheckIcon() {
   );
 }
 
-function buildInventarioPayload(inventario, itemDetails) {
-  const categorias = (inventario.categorias || []).map((categoria) => ({
-    nombre: categoria.nombre,
-    items: (categoria.items || []).map((item) => {
-      const key = getKey(categoria.nombre, item.nombre);
-      const detail = itemDetails[key] || { bodega: item.bodega || "", linea: item.linea || "" };
-      return {
-        nombre: item.nombre,
-        bodega: detail.bodega,
-        linea: detail.linea,
-      };
-    }),
-  }));
-
-  return {
-    id: inventario.id,
-    nombre: inventario.nombreInventario || inventario.tipoInventarioNombre || "Inventario",
-    tipo: inventario.tipoInventarioNombre || null,
-    creadoPor: inventario.createdByName || null,
-    ultimaEdicion: inventario.updatedByName || null,
-    exportadoEn: new Date().toISOString(),
-    categorias,
-  };
-}
-
-function handleDownloadJSON(inventario, itemDetails) {
-  const payload = buildInventarioPayload(inventario, itemDetails);
+function handleDownloadJSON(inventario, itemDetails, mode) {
+  const payload = buildInventarioPayload(inventario, itemDetails, mode);
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -117,6 +93,7 @@ export default function InventariosGuardados() {
   const [itemDetails, setItemDetails] = useState({});
   const [modoEdicion, setModoEdicion] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [modoExportacion, setModoExportacion] = useState("ambos");
 
   useEffect(() => {
     const load = async () => {
@@ -155,7 +132,7 @@ export default function InventariosGuardados() {
 
   const handleCopyJSON = async () => {
     if (!selectedInventario) return;
-    const payload = buildInventarioPayload(selectedInventario, itemDetails);
+    const payload = buildInventarioPayload(selectedInventario, itemDetails, modoExportacion);
     const text = JSON.stringify(payload, null, 2);
 
     try {
@@ -264,10 +241,23 @@ export default function InventariosGuardados() {
               </div>
 
               <div className="detail-actions">
+                <div className="export-mode-group" title="Selecciona qué datos exportar">
+                  <label className="export-mode-label" htmlFor="modo-exportacion">Exportar</label>
+                  <select
+                    id="modo-exportacion"
+                    className="export-mode-select"
+                    value={modoExportacion}
+                    onChange={(event) => setModoExportacion(event.target.value)}
+                  >
+                    <option value="ambos">Bodega + Línea</option>
+                    <option value="bodega">Solo bodega</option>
+                    <option value="linea">Solo línea</option>
+                  </select>
+                </div>
                 <button
                   type="button"
                   className="btn btn-download"
-                  onClick={() => handleDownloadJSON(selectedInventario, itemDetails)}
+                  onClick={() => handleDownloadJSON(selectedInventario, itemDetails, modoExportacion)}
                   title="Descargar como JSON"
                 >
                   <DownloadIcon /> JSON

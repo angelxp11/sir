@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bodega y Línea</title>
+
+<style>
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    background:#f4f4f4;
+    padding:30px;
+}
+
+.contenedor{
+    max-width:500px;
+    margin:auto;
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,.15);
+}
+
+h2{
+    text-align:center;
+}
+
+.tabla{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.encabezado{
+    font-weight:bold;
+    text-align:center;
+    font-size:18px;
+    margin-bottom:5px;
+}
+
+input{
+    width:100%;
+    box-sizing:border-box;
+    padding:8px;
+    text-align:center;
+    font-size:18px;
+}
+</style>
+
+</head>
+<body>
+
+<div class="contenedor">
+
+<h2>Registro</h2>
+
+<div class="tabla">
+
+<div class="encabezado">Bodega</div>
+<div class="encabezado">Línea</div>
+
+<!-- Filas -->
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+<input type="text" value="0" class="numero">
+<input type="text" value="0" class="numero">
+
+</div>
+
+</div>
+
+<script>
+
+document.querySelectorAll(".numero").forEach(input=>{
+
+    // Solo números
+    input.addEventListener("input",function(){
+
+        this.value=this.value.replace(/\D/g,'');
+
+        if(this.value===""){
+            this.value="0";
+        }
+
+    });
+
+    // Si queda vacío vuelve a 0
+    input.addEventListener("blur",function(){
+        if(this.value===""){
+            this.value="0";
+        }
+    });
+
+    // No permitir pegar
+    input.addEventListener("paste",e=>e.preventDefault());
+
+    // No permitir arrastrar texto
+    input.addEventListener("drop",e=>e.preventDefault());
+
+    // Al hacer foco y el valor sea 0, lo selecciona
+    input.addEventListener("focus",function(){
+        if(this.value==="0"){
+            this.select();
+        }
+    });
+
+});
+
+</script>
+
+</body>
+</html>

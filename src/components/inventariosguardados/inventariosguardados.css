@@ -180,6 +180,38 @@
   flex-shrink: 0;
 }
 
+/* ── export mode ── */
+.export-mode-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 128px;
+}
+
+.export-mode-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.export-mode-select {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  background: #fafafa;
+}
+
+.export-mode-select:focus {
+  outline: none;
+  border-color: var(--indigo);
+  background: var(--indigo-light);
+}
+
 /* ── buttons ── */
 .btn {
   display: inline-flex;
@@ -416,6 +448,11 @@
   .detail-actions {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .export-mode-group {
+    width: 100%;
+    min-width: 0;
   }
 
   .btn {
