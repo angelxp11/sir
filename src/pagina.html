@@ -6,44 +6,64 @@
 <title>Bodega y Línea</title>
 
 <style>
+*{
+    box-sizing:border-box;
+}
+
 body{
-    font-family: Arial, Helvetica, sans-serif;
-    background:#f4f4f4;
+    margin:0;
     padding:30px;
+    background:#f5f5f5;
+    font-family:Arial, Helvetica, sans-serif;
 }
 
 .contenedor{
-    max-width:500px;
+    max-width:600px;
     margin:auto;
-    background:white;
-    padding:20px;
+    background:#fff;
     border-radius:10px;
+    padding:20px;
     box-shadow:0 0 10px rgba(0,0,0,.15);
 }
 
 h2{
     text-align:center;
+    margin-top:0;
 }
 
 .tabla{
     display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
+    grid-template-columns:60px 1fr 1fr;
+    gap:8px;
+    align-items:center;
 }
 
 .encabezado{
     font-weight:bold;
     text-align:center;
-    font-size:18px;
-    margin-bottom:5px;
+    background:#1976d2;
+    color:white;
+    padding:10px;
+    border-radius:5px;
+    position:sticky;
+    top:0;
+}
+
+.numeroFila{
+    text-align:center;
+    font-weight:bold;
 }
 
 input{
     width:100%;
-    box-sizing:border-box;
     padding:8px;
     text-align:center;
-    font-size:18px;
+    font-size:16px;
+}
+
+.filas{
+    max-height:700px;
+    overflow-y:auto;
 }
 </style>
 
@@ -52,56 +72,46 @@ input{
 
 <div class="contenedor">
 
-<h2>Registro</h2>
+<h2>Bodega y Línea</h2>
 
 <div class="tabla">
+    <div class="encabezado">#</div>
+    <div class="encabezado">Bodega</div>
+    <div class="encabezado">Línea</div>
+</div>
 
-<div class="encabezado">Bodega</div>
-<div class="encabezado">Línea</div>
-
-<!-- Filas -->
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
-<input type="text" value="0" class="numero">
-<input type="text" value="0" class="numero">
-
+<div class="filas">
+    <div class="tabla" id="tabla"></div>
 </div>
 
 </div>
 
 <script>
 
+const tabla = document.getElementById("tabla");
+
+for(let i=1;i<=50;i++){
+
+    tabla.insertAdjacentHTML("beforeend",`
+        <div class="numeroFila">${i}</div>
+        <input type="text" value="0" class="numero">
+        <input type="text" value="0" class="numero">
+    `);
+
+}
+
 document.querySelectorAll(".numero").forEach(input=>{
+
+    // No permitir pegar
+    input.addEventListener("paste",e=>e.preventDefault());
+
+    // No permitir arrastrar
+    input.addEventListener("drop",e=>e.preventDefault());
 
     // Solo números
     input.addEventListener("input",function(){
 
-        this.value=this.value.replace(/\D/g,'');
+        this.value=this.value.replace(/[^0-9]/g,'');
 
         if(this.value===""){
             this.value="0";
@@ -111,22 +121,43 @@ document.querySelectorAll(".numero").forEach(input=>{
 
     // Si queda vacío vuelve a 0
     input.addEventListener("blur",function(){
+
         if(this.value===""){
             this.value="0";
         }
+
     });
 
-    // No permitir pegar
-    input.addEventListener("paste",e=>e.preventDefault());
-
-    // No permitir arrastrar texto
-    input.addEventListener("drop",e=>e.preventDefault());
-
-    // Al hacer foco y el valor sea 0, lo selecciona
+    // Al entrar al campo selecciona el contenido si es 0
     input.addEventListener("focus",function(){
+
         if(this.value==="0"){
             this.select();
         }
+
+    });
+
+    // Bloquear teclas que no sean números
+    input.addEventListener("keydown",function(e){
+
+        const permitidas=[
+            "Backspace",
+            "Delete",
+            "ArrowLeft",
+            "ArrowRight",
+            "ArrowUp",
+            "ArrowDown",
+            "Tab",
+            "Home",
+            "End"
+        ];
+
+        if(permitidas.includes(e.key)) return;
+
+        if(!/^[0-9]$/.test(e.key)){
+            e.preventDefault();
+        }
+
     });
 
 });

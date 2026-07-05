@@ -40,6 +40,7 @@ export function buildInventarioPayload(inventario, itemDetails, mode = "ambos") 
     creadoPor: inventario.createdByName || null,
     ultimaEdicion: inventario.updatedByName || null,
     exportadoEn: new Date().toISOString(),
+    modoExportacion: normalizedMode,
     categorias,
   };
 }
