@@ -2,9 +2,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import json
 import time
+import ctypes
 
 # Instalar:
-# pip install keyboard pyperclip
+# pip install keyboard pyperclip pyautogui pywin32
 
 import keyboard
 import pyperclip
@@ -26,6 +27,7 @@ COLOR_RED_DARK = "#b91c1c"
 COLOR_ORANGE = "#d97706"
 COLOR_GRAY_TXT = "#6b7280"
 COLOR_DARK_TXT = "#111827"
+COLOR_RELOJ_ESPERA = "#6b7280"
 
 CHIP_IDLE_BG = "#f3f4f6"
 CHIP_IDLE_FG = "#374151"
@@ -33,6 +35,94 @@ CHIP_DONE_BG = "#dcfce7"
 CHIP_DONE_FG = "#15803d"
 
 FONT_FAMILY = "Segoe UI"
+
+
+# ============================================================
+# MÉTODO 3: SendInput de Windows a nivel de sistema operativo,
+# con KEYEVENTF_UNICODE. Genera el evento como si viniera de un
+# teclado físico real, letra por letra. Solo funciona en Windows.
+# ============================================================
+PUL = ctypes.POINTER(ctypes.c_ulong)
+
+
+class KeyBdInput(ctypes.Structure):
+    _fields_ = [("wVk", ctypes.c_ushort),
+                ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+
+class HardwareInput(ctypes.Structure):
+    _fields_ = [("uMsg", ctypes.c_ulong),
+                ("wParamL", ctypes.c_short),
+                ("wParamH", ctypes.c_ushort)]
+
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [("dx", ctypes.c_long),
+                ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+
+class Input_I(ctypes.Union):
+    _fields_ = [("ki", KeyBdInput),
+                ("mi", MouseInput),
+                ("hi", HardwareInput)]
+
+
+class Input(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong),
+                ("ii", Input_I)]
+
+
+INPUT_KEYBOARD = 1
+KEYEVENTF_UNICODE = 0x0004
+KEYEVENTF_KEYUP = 0x0002
+VK_CONTROL = 0x11
+VK_A = 0x41
+VK_DELETE = 0x2E
+
+
+def _sendinput_tecla_vk(vk, key_up):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    flags = KEYEVENTF_KEYUP if key_up else 0
+    ii_.ki = KeyBdInput(vk, 0, flags, 0, ctypes.pointer(extra))
+    x = Input(INPUT_KEYBOARD, ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+
+def _sendinput_char_unicode(char, key_up=False):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    flags = KEYEVENTF_UNICODE | (KEYEVENTF_KEYUP if key_up else 0)
+    ii_.ki = KeyBdInput(0, ord(char), flags, 0, ctypes.pointer(extra))
+    x = Input(INPUT_KEYBOARD, ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+
+def sendinput_limpiar_campo():
+    _sendinput_tecla_vk(VK_CONTROL, False)
+    _sendinput_tecla_vk(VK_A, False)
+    _sendinput_tecla_vk(VK_A, True)
+    _sendinput_tecla_vk(VK_CONTROL, True)
+    time.sleep(0.06)
+    _sendinput_tecla_vk(VK_DELETE, False)
+    _sendinput_tecla_vk(VK_DELETE, True)
+    time.sleep(0.06)
+
+
+def sendinput_escribir(valor, delay_entre_letras=0.03):
+    sendinput_limpiar_campo()
+    for ch in str(valor):
+        _sendinput_char_unicode(ch, key_up=False)
+        time.sleep(0.008)
+        _sendinput_char_unicode(ch, key_up=True)
+        time.sleep(delay_entre_letras)
 
 
 class InventarioAutoRelleno:
@@ -44,8 +134,8 @@ class InventarioAutoRelleno:
         self.root.attributes("-topmost", True)
 
         ANCHO_FIJO = 400
-        ALTO_INICIAL = 620
-        ALTO_MINIMO = 480
+        ALTO_INICIAL = 660
+        ALTO_MINIMO = 520
 
         self.root.geometry(f"{ANCHO_FIJO}x{ALTO_INICIAL}")
         # El ancho queda fijo (mínimo = máximo); solo el alto se puede ajustar.
@@ -66,9 +156,31 @@ class InventarioAutoRelleno:
         self.requiere_enter_primero = True
         self.ventana_info = None
 
+        # Método de escritura seleccionado: "keyboard", "pyautogui" o "sendinput"
+        self.metodo_escritura = tk.StringVar(value="keyboard")
+
         # Tiempo (ms) que se muestra el chip en verde antes de pasar al
         # siguiente producto, para que el usuario vea la confirmación.
         self.RETARDO_TRANSICION_MS = 450
+
+        # Tiempo (ms) de "enfriamiento" tras escribir un valor, durante el
+        # cual se ignoran nuevas pulsaciones de Tab/Enter. Esto evita que,
+        # si el usuario mantiene presionada la tecla o la suelta muy rápido,
+        # se disparen varias escrituras seguidas antes de que el programa
+        # destino alcance a procesarlas. Si sigues viendo texto cortado o
+        # saltado, sube este valor (por ejemplo a 600 u 800).
+        self.RETARDO_BLOQUEO_MS = 400
+
+        # --- Reloj flotante (indicador de estado) ---
+        self.ventana_reloj = None
+        self.lbl_reloj_icono = None
+        self.lbl_reloj_texto = None
+        self.reloj_anim_id = None
+        self.escribiendo = False
+        self.reloj_frames = [
+            "🕐", "🕑", "🕒", "🕓", "🕔", "🕕",
+            "🕖", "🕗", "🕘", "🕙", "🕚", "🕛",
+        ]
 
         self.configurar_estilos()
         self.crear_interfaz()
@@ -89,6 +201,17 @@ class InventarioAutoRelleno:
             lightcolor=COLOR_PRIMARY,
             darkcolor=COLOR_PRIMARY,
             thickness=10,
+        )
+
+        style.configure(
+            "Metodo.TRadiobutton",
+            background=BG_APP,
+            foreground=COLOR_DARK_TXT,
+            font=(FONT_FAMILY, 9),
+        )
+        style.map(
+            "Metodo.TRadiobutton",
+            background=[("active", BG_APP)],
         )
 
     def boton_flat(self, parent, text, bg, fg, hover_bg, command, font_size=11, padx=16, pady=8, state="normal"):
@@ -178,6 +301,36 @@ class InventarioAutoRelleno:
             self.detener, font_size=12, state="disabled"
         )
         self.btn_detener.grid(row=1, column=1, sticky="ew", padx=(4, 0))
+
+        # ---------- SELECTOR DE MÉTODO DE ESCRITURA ----------
+        metodo_outer = tk.Frame(self.root, bg=BG_CARD, highlightbackground="#e5e7eb", highlightthickness=1)
+        metodo_outer.pack(fill="x", padx=24, pady=(0, 10))
+
+        metodo_inner = tk.Frame(metodo_outer, bg=BG_CARD)
+        metodo_inner.pack(fill="x", padx=14, pady=10)
+
+        tk.Label(
+            metodo_inner, text="Método de escritura:",
+            font=(FONT_FAMILY, 9, "bold"), bg=BG_CARD, fg=COLOR_GRAY_TXT
+        ).pack(anchor="w", pady=(0, 4))
+
+        opciones_frame = tk.Frame(metodo_inner, bg=BG_CARD)
+        opciones_frame.pack(fill="x")
+
+        ttk.Radiobutton(
+            opciones_frame, text="keyboard", value="keyboard",
+            variable=self.metodo_escritura, style="Metodo.TRadiobutton"
+        ).pack(side="left", padx=(0, 14))
+
+        ttk.Radiobutton(
+            opciones_frame, text="pyautogui", value="pyautogui",
+            variable=self.metodo_escritura, style="Metodo.TRadiobutton"
+        ).pack(side="left", padx=(0, 14))
+
+        ttk.Radiobutton(
+            opciones_frame, text="SendInput", value="sendinput",
+            variable=self.metodo_escritura, style="Metodo.TRadiobutton"
+        ).pack(side="left")
 
         # ---------- PROGRESO ----------
         progreso_frame = tk.Frame(self.root, bg=BG_APP)
@@ -319,7 +472,122 @@ class InventarioAutoRelleno:
         self.root.bind("<Up>", self.navegar_arriba)
         self.root.bind("<Down>", self.navegar_abajo)
 
-    # ------------------------- LÓGICA (sin cambios funcionales) -------------------------
+    # ------------------------- RELOJ FLOTANTE -------------------------
+    def crear_ventana_reloj(self):
+        """Crea la ventanita flotante, siempre encima, arriba a la derecha
+        de la pantalla, que muestra si el sistema está escribiendo o ya
+        terminó y está listo para la siguiente tecla."""
+
+        if self.ventana_reloj is not None:
+            return
+
+        v = tk.Toplevel(self.root)
+        v.overrideredirect(True)
+        v.attributes("-topmost", True)
+        try:
+            v.attributes("-alpha", 0.96)
+        except tk.TclError:
+            pass
+        v.configure(bg=COLOR_RELOJ_ESPERA)
+
+        ancho, alto = 230, 64
+        pantalla_ancho = v.winfo_screenwidth()
+        x = pantalla_ancho - ancho - 16
+        y = 16
+        v.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+        marco = tk.Frame(v, bg=COLOR_RELOJ_ESPERA)
+        marco.pack(fill="both", expand=True)
+
+        self.lbl_reloj_icono = tk.Label(
+            marco, text="🕐", font=(FONT_FAMILY, 22),
+            bg=COLOR_RELOJ_ESPERA, fg="white"
+        )
+        self.lbl_reloj_icono.pack(side="left", padx=(14, 10), pady=8)
+
+        self.lbl_reloj_texto = tk.Label(
+            marco, text="Esperando...", font=(FONT_FAMILY, 11, "bold"),
+            bg=COLOR_RELOJ_ESPERA, fg="white", justify="left", anchor="w"
+        )
+        self.lbl_reloj_texto.pack(side="left", pady=8, fill="x", expand=True)
+
+        self.ventana_reloj = v
+
+    def cerrar_ventana_reloj(self):
+        if self.reloj_anim_id is not None:
+            try:
+                self.root.after_cancel(self.reloj_anim_id)
+            except Exception:
+                pass
+            self.reloj_anim_id = None
+
+        if self.ventana_reloj is not None:
+            try:
+                self.ventana_reloj.destroy()
+            except Exception:
+                pass
+            self.ventana_reloj = None
+
+    def _pintar_reloj(self, color):
+        if self.ventana_reloj is None:
+            return
+        self.ventana_reloj.configure(bg=color)
+        for w in self.ventana_reloj.winfo_children():
+            w.configure(bg=color)
+        self.lbl_reloj_icono.configure(bg=color, fg="white")
+        self.lbl_reloj_texto.configure(bg=color, fg="white")
+
+    def _animar_reloj(self, frame_idx=0):
+        if self.ventana_reloj is None or not self.escribiendo:
+            return
+        icono = self.reloj_frames[frame_idx % len(self.reloj_frames)]
+        self.lbl_reloj_icono.config(text=icono)
+        self.reloj_anim_id = self.root.after(80, lambda: self._animar_reloj(frame_idx + 1))
+
+    def reloj_mostrar_escribiendo(self):
+        if self.ventana_reloj is None:
+            return
+        self.escribiendo = True
+        self._pintar_reloj(COLOR_ORANGE)
+        self.lbl_reloj_texto.configure(text="Escribiendo...\nno presiones aún")
+        self._animar_reloj(0)
+
+    def reloj_mostrar_listo(self):
+        if self.ventana_reloj is None:
+            return
+        self.escribiendo = False
+        if self.reloj_anim_id is not None:
+            try:
+                self.root.after_cancel(self.reloj_anim_id)
+            except Exception:
+                pass
+            self.reloj_anim_id = None
+        self._pintar_reloj(COLOR_GREEN)
+        self.lbl_reloj_icono.configure(text="✔")
+        self.lbl_reloj_texto.configure(text="Listo, ya puedes\npresionar de nuevo")
+
+    def reloj_mostrar_esperando(self, texto="Esperando\nla tecla..."):
+        if self.ventana_reloj is None:
+            return
+        self.escribiendo = False
+        if self.reloj_anim_id is not None:
+            try:
+                self.root.after_cancel(self.reloj_anim_id)
+            except Exception:
+                pass
+            self.reloj_anim_id = None
+        self._pintar_reloj(COLOR_RELOJ_ESPERA)
+        self.lbl_reloj_icono.configure(text="🕐")
+        self.lbl_reloj_texto.configure(text=texto)
+
+    def _finalizar_ciclo_reloj(self):
+        """Se ejecuta al terminar el tiempo de enfriamiento tras una
+        escritura: libera el bloqueo para aceptar la siguiente tecla."""
+        self.bloqueo_click = False
+        if self.activo and self.ventana_reloj is not None:
+            self.reloj_mostrar_esperando("Esperando\nsiguiente tecla")
+
+    # ------------------------- LÓGICA -------------------------
     def set_estado_frame(self, color_bg, color_fg):
         self.estado_frame.config(bg=color_bg)
         self.lbl_estado.config(bg=color_bg, fg=color_fg)
@@ -428,11 +696,40 @@ class InventarioAutoRelleno:
                 f"JSON inválido en el portapapeles:\n{str(e)}"
             )
 
+    # ------------------------- ESCRITURA (3 MÉTODOS) -------------------------
+    def _escribir_metodo_keyboard(self, valor, delay_entre_letras=0.045):
+        keyboard.send("ctrl+a")
+        time.sleep(0.06)
+        keyboard.send("delete")
+        time.sleep(0.06)
+        keyboard.write(str(valor), delay=delay_entre_letras)
+
+    def _escribir_metodo_pyautogui(self, valor, intervalo=0.045):
+        import pyautogui
+        pyautogui.PAUSE = 0
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(0.06)
+        pyautogui.press("delete")
+        time.sleep(0.06)
+        pyautogui.typewrite(str(valor), interval=intervalo)
+
+    def _escribir_metodo_sendinput(self, valor, delay_entre_letras=0.03):
+        sendinput_escribir(valor, delay_entre_letras=delay_entre_letras)
+
     def escribir_valor(self, valor):
 
         try:
             time.sleep(0.05)
-            keyboard.write(str(valor))
+
+            metodo = self.metodo_escritura.get()
+
+            if metodo == "pyautogui":
+                self._escribir_metodo_pyautogui(valor)
+            elif metodo == "sendinput":
+                self._escribir_metodo_sendinput(valor)
+            else:
+                self._escribir_metodo_keyboard(valor)
+
         except Exception as e:
             print(f"Error al escribir valor: {e}")
 
@@ -493,6 +790,11 @@ class InventarioAutoRelleno:
         self.lbl_estado.config(text=texto_estado)
         self.set_estado_frame("#dbeafe", COLOR_PRIMARY_DARK)
 
+        # Si el sistema sigue activo, deja el reloj listo para la siguiente
+        # pulsación una vez que se terminó de mostrar el nuevo producto.
+        if self.activo and not self.bloqueo_click:
+            self.reloj_mostrar_esperando("Esperando\nsiguiente tecla")
+
     def navegar_arriba(self, event=None):
 
         if self.activo:
@@ -546,6 +848,7 @@ class InventarioAutoRelleno:
         self.listener_id = keyboard.on_press_key("tab", lambda event: self.procesar_accion(event, "tab"))
         self.listener_enter_id = keyboard.on_press_key("enter", lambda event: self.procesar_accion(event, "enter"))
         self.requiere_enter_primero = True
+        self.bloqueo_click = False
 
         self.cerrar_ventana_info()
 
@@ -578,7 +881,7 @@ class InventarioAutoRelleno:
 
         tk.Label(
             contenido_info,
-            text="Enter o Tab escribirán el valor correspondiente.\nEl primer elemento comienza con Enter.",
+            text=f"Método: {self.metodo_escritura.get()}\nEnter o Tab escribirán el valor correspondiente.\nEl primer elemento comienza con Enter.",
             font=(FONT_FAMILY, 10),
             bg="#fef3c7",
             fg=COLOR_DARK_TXT,
@@ -587,6 +890,10 @@ class InventarioAutoRelleno:
         ).pack(anchor="w", pady=(4, 0))
 
         self.ventana_info = ventana_info
+
+        # Crea y muestra el reloj flotante arriba a la derecha.
+        self.crear_ventana_reloj()
+        self.reloj_mostrar_esperando("Esperando\nprimer Enter")
 
     def detener(self):
 
@@ -599,8 +906,10 @@ class InventarioAutoRelleno:
         self.listener_id = None
         self.listener_enter_id = None
         self.requiere_enter_primero = True
+        self.bloqueo_click = False
 
         self.cerrar_ventana_info()
+        self.cerrar_ventana_reloj()
 
         self.btn_comenzar.config(state="normal", bg=COLOR_GREEN)
         self.btn_detener.config(state="disabled", bg="#fca5a5")
@@ -638,6 +947,7 @@ class InventarioAutoRelleno:
         self.root.after(0, lambda: self.lbl_estado.config(text="🎉 INVENTARIO COMPLETADO"))
         self.root.after(0, lambda: self.set_estado_frame("#dcfce7", COLOR_GREEN_DARK))
         self.root.after(0, lambda: self.barra_progreso.config(value=self.barra_progreso["maximum"]))
+        self.root.after(0, self.cerrar_ventana_reloj)
 
         self.root.after(
             0,
@@ -670,7 +980,11 @@ class InventarioAutoRelleno:
             self.root.after(0, lambda: self.set_estado_frame("#fef3c7", COLOR_ORANGE))
             return
 
+        # Se bloquea de inmediato para ignorar pulsaciones repetidas
+        # (por ejemplo si se mantiene la tecla presionada) mientras se
+        # escribe y mientras dura el tiempo de enfriamiento posterior.
         self.bloqueo_click = True
+        self.root.after(0, self.reloj_mostrar_escribiendo)
 
         try:
 
@@ -683,6 +997,7 @@ class InventarioAutoRelleno:
                 self.root.after(0, lambda: self._marcar_chip_completo(self.chip_bodega, self.lbl_bodega))
                 self.root.after(0, lambda: self.lbl_estado.config(text="✔ BODEGA escrita"))
                 self.root.after(0, lambda: self.set_estado_frame("#dcfce7", COLOR_GREEN_DARK))
+                self.root.after(0, self.reloj_mostrar_listo)
 
                 self.indice += 1
                 self.requiere_enter_primero = False
@@ -700,6 +1015,7 @@ class InventarioAutoRelleno:
                 self.root.after(0, lambda: self._marcar_chip_completo(self.chip_linea, self.lbl_linea))
                 self.root.after(0, lambda: self.lbl_estado.config(text="✔ LÍNEA escrita"))
                 self.root.after(0, lambda: self.set_estado_frame("#dcfce7", COLOR_GREEN_DARK))
+                self.root.after(0, self.reloj_mostrar_listo)
 
                 self.indice += 1
                 self.requiere_enter_primero = False
@@ -719,6 +1035,7 @@ class InventarioAutoRelleno:
                     self.root.after(0, lambda: self._marcar_chip_completo(self.chip_bodega, self.lbl_bodega))
                     self.root.after(0, lambda: self.lbl_estado.config(text="Próxima tecla escribirá: LÍNEA"))
                     self.root.after(0, lambda: self.set_estado_frame("#fef3c7", COLOR_ORANGE))
+                    self.root.after(0, self.reloj_mostrar_listo)
 
                     self.estado = "linea"
                     self.requiere_enter_primero = False
@@ -730,6 +1047,7 @@ class InventarioAutoRelleno:
                     self.root.after(0, lambda: self._marcar_chip_completo(self.chip_linea, self.lbl_linea))
                     self.root.after(0, lambda: self.lbl_estado.config(text="✔ LÍNEA escrita"))
                     self.root.after(0, lambda: self.set_estado_frame("#dcfce7", COLOR_GREEN_DARK))
+                    self.root.after(0, self.reloj_mostrar_listo)
 
                     self.indice += 1
                     self.requiere_enter_primero = False
@@ -744,7 +1062,11 @@ class InventarioAutoRelleno:
             print(f"Error en procesar_accion: {e}")
 
         finally:
-            self.bloqueo_click = False
+            # No se libera el bloqueo de inmediato: se espera el tiempo de
+            # enfriamiento (RETARDO_BLOQUEO_MS) para que el programa destino
+            # alcance a procesar la escritura antes de aceptar la siguiente
+            # pulsación. El reloj pasa de "Listo" a "Esperando" al terminar.
+            self.root.after(self.RETARDO_BLOQUEO_MS, self._finalizar_ciclo_reloj)
 
 
 if __name__ == "__main__":
