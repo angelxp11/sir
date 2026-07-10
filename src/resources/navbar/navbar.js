@@ -1,174 +1,92 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import './navbar.css';
-import { FiMenu, FiChevronLeft } from 'react-icons/fi';
+import {
+  FiChevronsLeft,
+  FiChevronsRight,
+  FiBox,
+  FiUser,
+  FiShoppingBag,
+  FiEdit3,
+  FiList,
+  FiPlusCircle,
+  FiArchive,
+  FiLogOut,
+} from 'react-icons/fi';
 
-const Navbar = ({ onLogout, usuario, onNavigate }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const hideTimeoutRef = useRef(null);
+const NAV_ITEMS = [
+  { view: 'mi-perfil', label: 'Mi Perfil', icon: FiUser },
+  { view: 'mi-tienda', label: 'Mi Tienda', icon: FiShoppingBag },
+  { view: 'editar-personal', label: 'Editar Personal', icon: FiEdit3 },
+  { view: 'tipos-inventarios', label: 'Tipos de inventarios', icon: FiList },
+  { view: 'crear-inventario', label: 'Crear inventario', icon: FiPlusCircle },
+  { view: 'inventarios-guardados', label: 'Inventarios guardados', icon: FiArchive },
+];
 
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
-    resetAutoHideTimer();
-  };
+const Navbar = ({ onLogout, usuario, onNavigate, activeView }) => {
+  const displayName = usuario?.nombre || usuario?.displayName || usuario?.correo || "usuario";
 
-  const closeSidebar = () => {
-    setIsOpen(false);
-  };
+  // En pantallas pequeñas arranca contraído para no robarle espacio al contenido.
+  const [isCollapsed, setIsCollapsed] = useState(
+    typeof window !== 'undefined' && window.innerWidth <= 768
+  );
 
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
-    resetAutoHideTimer();
-  };
+  const toggleCollapse = () => setIsCollapsed((prev) => !prev);
 
-  const resetAutoHideTimer = () => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-    }
-    
-    // Solo auto-hide en móviles
-    if (window.innerWidth <= 768) {
-      hideTimeoutRef.current = setTimeout(() => {
-        setIsOpen(false);
-      }, 5000);
-    }
-  };
-
-  useEffect(() => {
-    const handleMouseMove = () => {
-      resetAutoHideTimer();
-    };
-
-    const handleResize = () => {
-      if (window.innerWidth > 768) {
-        setIsOpen(true);
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('resize', handleResize);
-
-    // Inicializar en base al tamaño
-    if (window.innerWidth > 768) {
-      setIsOpen(true);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('resize', handleResize);
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Mantener clases en el body para controlar el layout (colapso / cerrado)
   useEffect(() => {
     document.body.classList.toggle('sidebar-collapsed', isCollapsed);
-    // Cuando está cerrado en desktop, añadimos clase para ajustar el margin del contenido
-    const isDesktop = window.innerWidth > 768;
-    document.body.classList.toggle('sidebar-closed', !isOpen && isDesktop);
-  }, [isCollapsed, isOpen]);
-
-  const handleLinkClick = () => {
-    if (window.innerWidth <= 768) {
-      closeSidebar();
-    }
-  };
+  }, [isCollapsed]);
 
   const handleNav = (e, view) => {
     e.preventDefault();
     if (onNavigate) onNavigate(view);
-    handleLinkClick();
   };
 
   return (
-    <>
-      {/* Toggle button para móviles */}
-      <button
-        className="sidebar-toggle"
-        onClick={toggleSidebar}
-        aria-label={isOpen ? 'Cerrar sidebar' : 'Abrir sidebar'}
-        aria-expanded={isOpen}
-      >
-        {isOpen ? (
-          <FiChevronLeft size={20} />
-        ) : (
-          <FiMenu size={20} />
-        )}
-      </button>
+    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+      <div className="sidebar-header">
+        <a
+          href="/"
+          className="sidebar-brand"
+          onClick={(e) => handleNav(e, 'dashboard')}
+        >
+          <FiBox size={24} />
+          {!isCollapsed && <span>Inventario{usuario ? ` · ${displayName}` : ''}</span>}
+        </a>
+        <button
+          className="collapse-btn"
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
+          title={isCollapsed ? 'Expandir' : 'Contraer'}
+        >
+          {isCollapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={18} />}
+        </button>
+      </div>
 
-      {/* Overlay para móviles */}
-      {isOpen && window.innerWidth <= 768 && (
-        <div className="sidebar-overlay" onClick={closeSidebar}></div>
-      )}
+      <nav className="sidebar-nav">
+        <ul className="sidebar-menu">
+          {NAV_ITEMS.map(({ view, label, icon: Icon }) => (
+            <li className="sidebar-item" key={view}>
+              <button
+                type="button"
+                className={`sidebar-link ${activeView === view ? 'active' : ''}`}
+                onClick={(e) => handleNav(e, view)}
+                aria-current={activeView === view ? 'page' : undefined}
+              >
+                <Icon size={20} />
+                {!isCollapsed && <span>{label}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${isOpen ? 'open' : 'closed'} ${isCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-header">
-          <a href="/" className="sidebar-brand">
-            <i className="ti ti-package"></i>
-            {!isCollapsed && <span>Inventario</span>}
-          </a>
-          <button
-            className="collapse-btn"
-            onClick={toggleCollapse}
-            aria-label="Collapse sidebar"
-            title={isCollapsed ? 'Expandir' : 'Contraer'}
-          >
-            <i className={`ti ${isCollapsed ? 'ti-arrow-right' : 'ti-arrow-left'}`}></i>
-          </button>
-        </div>
-
-        <nav className="sidebar-nav">
-          <ul className="sidebar-menu">
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-perfil')}>
-                <i className="ti ti-user"></i>
-                {!isCollapsed && <span>Mi Perfil</span>}
-              </button>
-            </li>
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'mi-tienda')}>
-                <i className="ti ti-building"></i>
-                {!isCollapsed && <span>Mi Tienda</span>}
-              </button>
-            </li>
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'editar-personal')}>
-                <i className="ti ti-pencil"></i>
-                {!isCollapsed && <span>Editar Personal</span>}
-              </button>
-            </li>
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'tipos-inventarios')}>
-                <i className="ti ti-list"></i>
-                {!isCollapsed && <span>Tipos de inventarios</span>}
-              </button>
-            </li>
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'crear-inventario')}>
-                <i className="ti ti-plus"></i>
-                {!isCollapsed && <span>Crear inventario</span>}
-              </button>
-            </li>
-            <li className="sidebar-item">
-              <button type="button" className="sidebar-link" onClick={(e) => handleNav(e, 'inventarios-guardados')}>
-                <i className="ti ti-stack"></i>
-                {!isCollapsed && <span>Inventarios guardados</span>}
-              </button>
-            </li>
-          </ul>
-        </nav>
-
-        <div className="sidebar-footer">
-          <button className="sidebar-link logout-btn" onClick={() => { if (onLogout) onLogout(); }}>
-            <i className="ti ti-logout"></i>
-            {!isCollapsed && <span>Cerrar sesión</span>}
-          </button>
-        </div>
-      </aside>
-    </>
+      <div className="sidebar-footer">
+        <button className="sidebar-link logout-btn" onClick={() => { if (onLogout) onLogout(); }}>
+          <FiLogOut size={20} />
+          {!isCollapsed && <span>Cerrar sesión</span>}
+        </button>
+      </div>
+    </aside>
   );
 };
 

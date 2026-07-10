@@ -3,7 +3,7 @@ import "./login.css";
 import { iniciarSesionConCorreoYContrasena } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
 
-export default function Login({ onLoginSuccess, setLoading }) {
+export default function Login({ onLoginSuccess, setLoading, onGoToRegister }) {
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -69,6 +69,13 @@ export default function Login({ onLoginSuccess, setLoading }) {
           <button type="submit" className="login-btn">
             Ingresar
           </button>
+
+          <p className="auth-link">
+            ¿No tienes cuenta?{" "}
+            <button type="button" className="link-button" onClick={onGoToRegister}>
+              Regístrate
+            </button>
+          </p>
         </form>
       </div>
     </div>

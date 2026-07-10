@@ -1,29 +1,52 @@
 .mi-perfil {
-  padding: 28px;
-  min-height: calc(100vh - 80px);
-  background: var(--color-surface, #fff);
-  color: var(--color-text, #000);
+  width: 100%;
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 }
 
-.mi-perfil h2 {
-  margin-bottom: 16px;
+.perfil-header {
+  margin-bottom: 24px;
+}
+
+.perfil-header .eyebrow {
+  display: block;
+  font-family: var(--font-display, inherit);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary, #2454d6);
+  margin-bottom: 8px;
+}
+
+.perfil-header h2 {
+  font-family: var(--font-display, inherit);
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--color-text, #1e2a3a);
+  margin-bottom: 6px;
+}
+
+.perfil-header p {
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.95rem;
 }
 
 .perfil-card {
   max-width: 720px;
-  background: var(--color-bg, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.08));
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e3e7ee);
+  border-radius: 16px;
+  padding: 6px 22px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
 }
 
 .perfil-row {
   display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px dashed rgba(0,0,0,0.04);
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--color-border, #e3e7ee);
+  align-items: start;
 }
 
 .perfil-row:last-child {
@@ -32,10 +55,50 @@
 
 .perfil-key {
   font-weight: 700;
-  color: var(--color-text-muted, #333);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #64748b);
 }
 
 .perfil-value {
-  color: var(--color-text, #000);
+  color: var(--color-text, #1e2a3a);
+  font-size: 0.95rem;
   word-break: break-word;
+}
+
+/* Estados: cargando / error / sin usuario */
+.mi-perfil-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  text-align: center;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.95rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e3e7ee);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 720px;
+}
+
+/* ======== Responsive ======== */
+
+@media (max-width: 600px) {
+  .perfil-card {
+    padding: 4px 16px;
+  }
+
+  .perfil-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .perfil-header h2 {
+    font-size: 1.4rem;
+  }
 }

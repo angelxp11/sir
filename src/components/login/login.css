@@ -94,6 +94,26 @@
   transform: scale(0.98);
 }
 
+.auth-link {
+  text-align: center;
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
 /* Tablet */
 @media (max-width: 768px) {
   .login-card {

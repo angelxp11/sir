@@ -6,6 +6,8 @@ import {
   obtenerInformacionUsuarioPorUid,
   crearTipoInventario,
   obtenerTiposInventarioPorTienda,
+  actualizarTipoInventario,
+  eliminarTipoInventario,
 } from "../../server/funtions";
 
 const createEmptyItem = () => ({ id: `${Date.now()}-${Math.random()}`, nombre: "", unidad: "" });
@@ -19,6 +21,9 @@ export default function TiposInventario() {
   const [tipoNombre, setTipoNombre] = useState("");
   const [categorias, setCategorias] = useState([createEmptyCategory()]);
   const [message, setMessage] = useState("");
+  const [editingTipoId, setEditingTipoId] = useState(null);
+  const [deletingTipoId, setDeletingTipoId] = useState(null);
+  const [excelFileName, setExcelFileName] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -106,9 +111,34 @@ export default function TiposInventario() {
     );
   };
 
+  const resetForm = () => {
+    setTipoNombre("");
+    setCategorias([createEmptyCategory()]);
+    setEditingTipoId(null);
+    setExcelFileName("");
+  };
+
+  const handleDownloadTemplate = () => {
+    const header = ["Nombre del item", "Categoría", "Unidad de medida"];
+    const ejemplos = [
+      ["Arroz", "Granos", "kg"],
+      ["Leche entera", "Lácteos", "L"],
+      ["Detergente", "Aseo", "unidad"],
+    ];
+
+    const hoja = XLSX.utils.aoa_to_sheet([header, ...ejemplos]);
+    hoja["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 18 }];
+
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Plantilla");
+    XLSX.writeFile(libro, "plantilla_tipo_inventario.xlsx");
+  };
+
   const handleExcelFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    setExcelFileName(file.name);
 
     try {
       const data = await file.arrayBuffer();
@@ -168,13 +198,8 @@ export default function TiposInventario() {
     }
   };
 
-  const handleSaveTipo = async () => {
-    if (!tipoNombre.trim()) {
-      setMessage("Debes escribir el nombre del tipo de inventario.");
-      return;
-    }
-
-    const payload = categorias
+  const buildPayload = () => {
+    return categorias
       .map((cat) => ({
         nombre: cat.nombre.trim(),
         items: cat.items
@@ -185,37 +210,117 @@ export default function TiposInventario() {
           .filter((item) => item.nombre),
       }))
       .filter((cat) => cat.nombre && cat.items.length);
+  };
+
+  const handleSaveTipo = async () => {
+    if (!tipoNombre.trim()) {
+      setMessage("Debes escribir el nombre del tipo de inventario.");
+      return;
+    }
+
+    const payload = buildPayload();
 
     if (!payload.length) {
-      setMessage("Debes definir al menos una categor�a con uno o m�s items.");
+      setMessage("Debes definir al menos una categoría con uno o más items.");
       return;
     }
 
     try {
-      await crearTipoInventario(tiendaId, tipoNombre.trim(), payload);
-      setMessage("Tipo de inventario guardado correctamente.");
-      setTipoNombre("");
-      setCategorias([createEmptyCategory()]);
+      if (editingTipoId) {
+        await actualizarTipoInventario(editingTipoId, tipoNombre.trim(), payload);
+        setMessage("Tipo de inventario actualizado correctamente.");
+      } else {
+        await crearTipoInventario(tiendaId, tipoNombre.trim(), payload);
+        setMessage("Tipo de inventario guardado correctamente.");
+      }
+      resetForm();
       await loadTipos(tiendaId);
     } catch (error) {
       console.error(error);
-      setMessage("Error al guardar el tipo de inventario.");
+      setMessage(
+        editingTipoId
+          ? "Error al actualizar el tipo de inventario."
+          : "Error al guardar el tipo de inventario."
+      );
+    }
+  };
+
+  const handleEditTipo = (tipo) => {
+    setEditingTipoId(tipo.id);
+    setTipoNombre(tipo.nombre || "");
+    const cats = tipo.categorias?.length
+      ? tipo.categorias.map((cat) => ({
+          id: `${Date.now()}-${Math.random()}`,
+          nombre: cat.nombre || "",
+          items: cat.items?.length
+            ? cat.items.map((item) => ({
+                id: `${Date.now()}-${Math.random()}`,
+                nombre: item.nombre || "",
+                unidad: item.unidad || "",
+              }))
+            : [createEmptyItem()],
+        }))
+      : [createEmptyCategory()];
+    setCategorias(cats);
+    setMessage("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+    setMessage("");
+  };
+
+  const handleDeleteTipo = async (tipo) => {
+    const confirmed = window.confirm(
+      `¿Seguro que quieres eliminar "${tipo.nombre}"? Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingTipoId(tipo.id);
+      await eliminarTipoInventario(tipo.id);
+      if (editingTipoId === tipo.id) {
+        resetForm();
+      }
+      await loadTipos(tiendaId);
+      setMessage("Tipo de inventario eliminado.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Error al eliminar el tipo de inventario.");
+    } finally {
+      setDeletingTipoId(null);
     }
   };
 
   if (loading) {
-    return <div className="tipos-inventario">Cargando tipos de inventario...</div>;
+    return (
+      <div className="tipos-inventario">
+        <div className="tipos-inventario-state">Cargando tipos de inventario...</div>
+      </div>
+    );
   }
 
   if (!user) {
-    return <div className="tipos-inventario">Necesitas iniciar sesi�n para ver esta secci�n.</div>;
+    return (
+      <div className="tipos-inventario">
+        <div className="tipos-inventario-state">
+          Necesitas iniciar sesión para ver esta sección.
+        </div>
+      </div>
+    );
   }
 
   if (!tiendaId) {
     return (
       <div className="tipos-inventario">
-        <h2>Tipos de inventarios</h2>
-        <p>No se encontr� una tienda asociada a tu usuario.</p>
+        <div className="tipos-header">
+          <span className="eyebrow">Inventario</span>
+          <h2>Tipos de inventarios</h2>
+        </div>
+        <div className="tipos-inventario-state">
+          No se encontró una tienda asociada a tu usuario.
+        </div>
       </div>
     );
   }
@@ -223,14 +328,17 @@ export default function TiposInventario() {
   return (
     <div className="tipos-inventario">
       <div className="tipos-header">
+        <span className="eyebrow">Inventario</span>
         <h2>Tipos de inventarios</h2>
-        <p>Define nombres, categor�as y items para los inventarios de tu tienda.</p>
+        <p>Define nombres, categorías y items para los inventarios de tu tienda.</p>
       </div>
 
       <section className="tipos-form">
-        <h3>Crear nuevo tipo de inventario</h3>
+        <h3>
+          {editingTipoId ? "Editar tipo de inventario" : "Crear nuevo tipo de inventario"}
+        </h3>
         {!isGerente() && (
-          <p className="warning">Solo el gerente puede crear tipos de inventario.</p>
+          <p className="warning">Solo el gerente puede crear o editar tipos de inventario.</p>
         )}
 
         <div className="field-group">
@@ -245,12 +353,27 @@ export default function TiposInventario() {
 
         <div className="field-group excel-import">
           <label>Importar desde Excel</label>
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleExcelFileChange}
-            disabled={!isGerente()}
-          />
+          <div className="excel-import-controls">
+            <label className={`file-upload-btn ${!isGerente() ? "disabled" : ""}`}>
+              Elegir archivo
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFileChange}
+                disabled={!isGerente()}
+              />
+            </label>
+            <span className="file-upload-name">
+              {excelFileName || "Ningún archivo seleccionado"}
+            </span>
+            <button
+              className="btn ghost small"
+              type="button"
+              onClick={handleDownloadTemplate}
+            >
+              Descargar plantilla
+            </button>
+          </div>
           <small>Columna A = Nombre del item, Columna B = Categoría, Columna C = Unidad de medida</small>
         </div>
 
@@ -258,21 +381,22 @@ export default function TiposInventario() {
           <div className="category-card" key={categoria.id}>
             <div className="category-header">
               <div>
-                <label>Categor�a {catIndex + 1}</label>
+                <label>Categoría {catIndex + 1}</label>
                 <input
                   value={categoria.nombre}
                   onChange={(e) => changeCategoryName(categoria.id, e.target.value)}
-                  placeholder="Nombre de categor�a"
+                  placeholder="Nombre de categoría"
                   disabled={!isGerente()}
                 />
               </div>
               {categorias.length > 1 && isGerente() && (
                 <button
-                  className="small-btn danger"
+                  className="icon-btn danger"
                   onClick={() => removeCategory(categoria.id)}
                   type="button"
+                  title="Eliminar categoría"
                 >
-                  Eliminar categor�a
+                  Eliminar categoría
                 </button>
               )}
             </div>
@@ -294,11 +418,12 @@ export default function TiposInventario() {
                   />
                   {categoria.items.length > 1 && isGerente() && (
                     <button
-                      className="small-btn danger"
+                      className="icon-btn danger ghost"
                       onClick={() => removeItem(categoria.id, item.id)}
                       type="button"
+                      title="Quitar item"
                     >
-                      Quitar
+                      ✕
                     </button>
                   )}
                 </div>
@@ -307,11 +432,11 @@ export default function TiposInventario() {
 
             {isGerente() && (
               <button
-                className="small-btn"
+                className="icon-btn"
                 type="button"
                 onClick={() => addItem(categoria.id)}
               >
-                Agregar item
+                + Agregar item
               </button>
             )}
           </div>
@@ -319,11 +444,16 @@ export default function TiposInventario() {
 
         {isGerente() && (
           <div className="form-actions">
-            <button className="btn" type="button" onClick={addCategory}>
-              Agregar categor�a
+            <button className="btn secondary" type="button" onClick={addCategory}>
+              + Agregar categoría
             </button>
+            {editingTipoId && (
+              <button className="btn ghost" type="button" onClick={handleCancelEdit}>
+                Cancelar edición
+              </button>
+            )}
             <button className="btn primary" type="button" onClick={handleSaveTipo}>
-              Guardar tipo de inventario
+              {editingTipoId ? "Guardar cambios" : "Guardar tipo de inventario"}
             </button>
           </div>
         )}
@@ -334,12 +464,36 @@ export default function TiposInventario() {
       <section className="tipos-list">
         <h3>Tipos de inventario existentes</h3>
         {tipos.length === 0 ? (
-          <p>No hay tipos de inventario definidos a�n.</p>
+          <p>No hay tipos de inventario definidos aún.</p>
         ) : (
           tipos.map((tipo) => (
-            <div className="tipo-card" key={tipo.id}>
-              <div className="tipo-title">
-                <strong>{tipo.nombre}</strong>
+            <div
+              className={`tipo-card ${editingTipoId === tipo.id ? "editing" : ""}`}
+              key={tipo.id}
+            >
+              <div className="tipo-card-header">
+                <div className="tipo-title">
+                  <strong>{tipo.nombre}</strong>
+                </div>
+                {isGerente() && (
+                  <div className="tipo-card-actions">
+                    <button
+                      className="btn secondary small"
+                      type="button"
+                      onClick={() => handleEditTipo(tipo)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="btn danger small"
+                      type="button"
+                      onClick={() => handleDeleteTipo(tipo)}
+                      disabled={deletingTipoId === tipo.id}
+                    >
+                      {deletingTipoId === tipo.id ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </div>
+                )}
               </div>
               {tipo.categorias?.map((cat) => (
                 <div className="tipo-category" key={`${tipo.id}-${cat.nombre}`}>

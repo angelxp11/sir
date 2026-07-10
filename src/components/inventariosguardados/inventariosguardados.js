@@ -300,11 +300,11 @@ export default function InventariosGuardados() {
                             <input
                               className="inv-input"
                               type="text"
-                              inputMode="numeric"
-                              pattern="\d*"
+                              inputMode="decimal"
+                              pattern="[0-9]*[.,]?[0-9]*"
                               value={detail.bodega}
                               onChange={(e) =>
-                                handleDetailChange(key, "bodega", e.target.value.replace(/\D/g, ""))
+                                handleDetailChange(key, "bodega", e.target.value.replace(/[^0-9.,]/g, ""))
                               }
                               placeholder="0"
                             />
@@ -314,11 +314,11 @@ export default function InventariosGuardados() {
                             <input
                               className="inv-input"
                               type="text"
-                              inputMode="numeric"
-                              pattern="\d*"
+                              inputMode="decimal"
+                              pattern="[0-9]*[.,]?[0-9]*"
                               value={detail.linea}
                               onChange={(e) =>
-                                handleDetailChange(key, "linea", e.target.value.replace(/\D/g, ""))
+                                handleDetailChange(key, "linea", e.target.value.replace(/[^0-9.,]/g, ""))
                               }
                               placeholder="0"
                             />

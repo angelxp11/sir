@@ -8,62 +8,96 @@ import TiposInventario from "../tiposinventarios/tiposinventario";
 import CrearInventario from "../crearinventario/crearinventario";
 import InventariosGuardados from "../inventariosguardados/inventariosguardados";
 import { useState } from "react";
+import {
+  FiArrowLeft,
+  FiUser,
+  FiShoppingBag,
+  FiEdit3,
+  FiList,
+  FiPlusCircle,
+  FiArchive,
+} from "react-icons/fi";
+
+// Mismos destinos que el sidebar, así el dashboard y el navbar nunca se
+// desincronizan: agregar una vista en un solo lugar la muestra en ambos.
+const QUICK_ACTIONS = [
+  { view: "mi-perfil", label: "Mi Perfil", desc: "Consulta y actualiza tus datos personales.", icon: FiUser },
+  { view: "mi-tienda", label: "Mi Tienda", desc: "Administra la información de tu tienda.", icon: FiShoppingBag },
+  { view: "editar-personal", label: "Editar Personal", desc: "Gestiona los datos de tu equipo de trabajo.", icon: FiEdit3 },
+  { view: "tipos-inventarios", label: "Tipos de inventarios", desc: "Define las categorías de tu inventario.", icon: FiList },
+  { view: "crear-inventario", label: "Crear inventario", desc: "Registra un nuevo inventario desde cero.", icon: FiPlusCircle },
+  { view: "inventarios-guardados", label: "Inventarios guardados", desc: "Revisa y edita los inventarios ya creados.", icon: FiArchive },
+];
+
+const VIEW_COMPONENTS = {
+  "mi-perfil": MiPerfil,
+  "mi-tienda": MiTienda,
+  "editar-personal": EditarPersonal,
+  "tipos-inventarios": TiposInventario,
+  "crear-inventario": CrearInventario,
+  "inventarios-guardados": InventariosGuardados,
+};
 
 export default function HomePage({ onLogout, usuario }) {
   const [activeView, setActiveView] = useState('dashboard');
+
+  const displayName = usuario?.nombre || usuario?.displayName || usuario?.correo || "usuario";
 
   const handleNavigate = (view) => {
     setActiveView(view);
   };
 
+  const goHome = () => setActiveView('dashboard');
+
+  const ActiveComponent = VIEW_COMPONENTS[activeView];
+
   return (
     <div className="home">
-      <Navbar onLogout={onLogout} usuario={usuario} onNavigate={handleNavigate} />
+      <Navbar
+        onLogout={onLogout}
+        usuario={usuario}
+        onNavigate={handleNavigate}
+        activeView={activeView}
+      />
 
       <main className="main-content">
-        {activeView === 'dashboard' && (
-          <>
-            <section className="hero">
-              <div className="hero-content">
-                <h1>Bienvenido a Nuestra Plataforma</h1>
-                <p>
-                  Gestiona toda tu información de manera rápida,
-                  segura y desde cualquier dispositivo.
-                </p>
+        {activeView === 'dashboard' ? (
+          <section className="quick-actions-section">
+            <div className="section-heading">
+              <span className="eyebrow">Accesos rápidos</span>
+              <h2>Bienvenido{usuario ? `, ${displayName}` : ''}</h2>
+              <p>Las mismas secciones del menú lateral, listas para usar desde aquí.</p>
+            </div>
 
-                <button className="hero-btn">Comenzar Ahora</button>
-              </div>
-            </section>
+            <div className="quick-actions">
+              {QUICK_ACTIONS.map(({ view, label, desc, icon: Icon }) => (
+                <button
+                  key={view}
+                  type="button"
+                  className="action-card"
+                  onClick={() => handleNavigate(view)}
+                >
+                  <span className="action-icon">
+                    <Icon size={22} />
+                  </span>
+                  <h3>{label}</h3>
+                  <p>{desc}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="view-section">
+            <button type="button" className="back-btn" onClick={goHome}>
+              <FiArrowLeft size={18} />
+              Volver al inicio
+            </button>
 
-            <section className="cards-section">
-              <h2>Nuestros Servicios</h2>
-
-              <div className="cards">
-                <div className="card">
-                  <h3>Gestión</h3>
-                  <p>Administra tus procesos de forma eficiente.</p>
-                </div>
-
-                <div className="card">
-                  <h3>Seguridad</h3>
-                  <p>Protegemos tus datos con altos estándares.</p>
-                </div>
-
-                <div className="card">
-                  <h3>Reportes</h3>
-                  <p>Obtén información en tiempo real.</p>
-                </div>
-              </div>
-            </section>
-          </>
+            {ActiveComponent && (
+              <ActiveComponent usuario={activeView === 'mi-perfil' ? usuario : undefined} />
+            )}
+          </section>
         )}
-
-        {activeView === 'mi-perfil' && <MiPerfil usuario={usuario} />}
-        {activeView === 'mi-tienda' && <MiTienda />}
-        {activeView === 'editar-personal' && <EditarPersonal />}
-        {activeView === 'tipos-inventarios' && <TiposInventario />}
-        {activeView === 'crear-inventario' && <CrearInventario />}
-        {activeView === 'inventarios-guardados' && <InventariosGuardados />}
       </main>
     </div>
   );

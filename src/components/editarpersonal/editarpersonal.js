@@ -20,6 +20,7 @@ export default function EditarPersonal() {
     idTienda: "",
     activo: true,
   });
+  const [tiendaNombre, setTiendaNombre] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
 
@@ -49,6 +50,7 @@ export default function EditarPersonal() {
 
       const tiendaData = await obtenerTiendaPorId(u.idTienda);
       setTienda(tiendaData);
+      setTiendaNombre(tiendaData?.nombre || "");
 
       if (tiendaData?.personal?.length) {
         const members = await obtenerInformacionUsuariosPorIds(tiendaData.personal);
@@ -70,6 +72,7 @@ export default function EditarPersonal() {
       idTienda: member.idTienda || "",
       activo: member.activo !== undefined ? member.activo : true,
     });
+    setTiendaNombre(tienda?.nombre || "");
     setMessage(null);
   };
 
@@ -103,18 +106,43 @@ export default function EditarPersonal() {
     }
   };
 
-  if (loading) return <div className="editar-personal">Cargando...</div>;
-  if (!user || !isManager(user))
-    return <div className="editar-personal">Acceso denegado: solo el gerente puede editar personal.</div>;
-  if (!tienda)
-    return <div className="editar-personal">No se encontró una tienda asociada a este gerente.</div>;
+  if (loading) {
+    return (
+      <div className="editar-personal">
+        <div className="editar-personal-state">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (!user || !isManager(user)) {
+    return (
+      <div className="editar-personal">
+        <div className="editar-personal-state">
+          Acceso denegado: solo el gerente puede editar personal.
+        </div>
+      </div>
+    );
+  }
+
+  if (!tienda) {
+    return (
+      <div className="editar-personal">
+        <div className="editar-personal-state">
+          No se encontró una tienda asociada a este gerente.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="editar-personal">
-      <div className="editar-card">
+      <div className="editar-header">
+        <span className="eyebrow">Tu equipo</span>
         <h2>Editar Personal</h2>
-        <p className="subtitle">Selecciona un miembro del personal para actualizar sus datos.</p>
+        <p>Selecciona un miembro del personal para actualizar sus datos.</p>
+      </div>
 
+      <div className="editar-card">
         <div className="editar-grid">
           <div className="staff-list">
             <h3>Personal de la tienda</h3>
@@ -157,35 +185,24 @@ export default function EditarPersonal() {
                 />
 
                 <label>Rol</label>
-                <input
-                  type="text"
+                <select
                   value={formValues.rol}
                   onChange={(e) => handleChange("rol", e.target.value)}
-                  placeholder="GERENTE o EMPLEADO"
-                />
-
-                <label>UID</label>
-                <input
-                  type="text"
-                  value={selectedMember.id || selectedMember.uid || ""}
-                  readOnly
-                />
-
-                <label>ID Tienda</label>
-                <input
-                  type="text"
-                  value={formValues.idTienda}
-                  onChange={(e) => handleChange("idTienda", e.target.value)}
-                  placeholder="ID de la tienda"
-                />
-
-                <label>Activo</label>
-                <select
-                  value={formValues.activo ? "true" : "false"}
-                  onChange={(e) => handleChange("activo", e.target.value === "true")}
                 >
-                  <option value="true">true</option>
-                  <option value="false">false</option>
+                  <option value="GERENTE">GERENTE</option>
+                  <option value="LIDER">LIDER</option>
+                </select>
+
+                <label>Tienda</label>
+                <input type="text" value={tiendaNombre} readOnly />
+
+                <label>Estado</label>
+                <select
+                  value={formValues.activo ? "activo" : "inactivo"}
+                  onChange={(e) => handleChange("activo", e.target.value === "activo")}
+                >
+                  <option value="activo">Activo</option>
+                  <option value="inactivo">Inactivo</option>
                 </select>
 
                 <button onClick={handleSave}>Guardar cambios</button>

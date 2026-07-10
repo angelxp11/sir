@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
 import Login from "./components/login/login";
+import Register from "./components/register/register";
 import HomePage from "./components/homepage/homepage";
 import ToastContainer, { showToast } from "./resources/toastcontainer/ToastContainer";
 import Loading from "./resources/loading/loading";
@@ -13,6 +14,7 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [usuario, setUsuario] = useState(null);
+  const [authView, setAuthView] = useState("login");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -60,8 +62,18 @@ function App() {
       <ToastContainer />
       {isLoggedIn ? (
         <HomePage usuario={usuario} onLogout={handleLogout} />
+      ) : authView === "register" ? (
+        <Register
+          onRegisterSuccess={() => setAuthView("login")}
+          setLoading={setIsLoading}
+          onGoToLogin={() => setAuthView("login")}
+        />
       ) : (
-        <Login onLoginSuccess={() => setIsLoggedIn(true)} setLoading={setIsLoading} />
+        <Login
+          onLoginSuccess={() => setIsLoggedIn(true)}
+          setLoading={setIsLoading}
+          onGoToRegister={() => setAuthView("register")}
+        />
       )}
     </div>
   );

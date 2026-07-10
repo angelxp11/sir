@@ -37,8 +37,10 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (request.auth.uid == userId || isGerente());
 
-      // solo gerente puede crear usuarios (asignar personal)
-      allow create: if isGerente();
+      // cualquier usuario autenticado puede crear su propio documento de perfil
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid;
 
       // gerente puede editar personal de su tienda
       // usuario solo puede editar su propio perfil (limitado)

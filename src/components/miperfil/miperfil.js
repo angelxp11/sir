@@ -3,6 +3,13 @@ import './miperfil.css';
 import { auth } from '../../server/server';
 import { obtenerInformacionUsuarioPorUid } from '../../server/funtions';
 
+// Convierte claves tipo "idTienda" o "correo_electronico" en etiquetas legibles.
+const humanizeKey = (key) =>
+  key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase());
+
 export default function MiPerfil({ usuario: usuarioProp }) {
   const [usuario, setUsuario] = useState(usuarioProp || null);
   const [loading, setLoading] = useState(!usuarioProp);
@@ -34,21 +41,30 @@ export default function MiPerfil({ usuario: usuarioProp }) {
     fetchUser();
   }, [usuarioProp]);
 
-  if (loading) return <div className="mi-perfil">Cargando perfil...</div>;
-  if (error) return <div className="mi-perfil">Error: {error}</div>;
-  if (!usuario) return <div className="mi-perfil">No hay usuario conectado.</div>;
-
   return (
     <div className="mi-perfil">
-      <h2>Mi Perfil</h2>
-      <div className="perfil-card">
-        {Object.keys(usuario).map((key) => (
-          <div className="perfil-row" key={key}>
-            <div className="perfil-key">{key}</div>
-            <div className="perfil-value">{String(usuario[key])}</div>
-          </div>
-        ))}
+      <div className="perfil-header">
+        <span className="eyebrow">Tu cuenta</span>
+        <h2>Mi Perfil</h2>
+        <p>Información asociada a tu cuenta.</p>
       </div>
+
+      {loading && <div className="mi-perfil-state">Cargando perfil...</div>}
+      {!loading && error && <div className="mi-perfil-state">Error: {error}</div>}
+      {!loading && !error && !usuario && (
+        <div className="mi-perfil-state">No hay usuario conectado.</div>
+      )}
+
+      {!loading && !error && usuario && (
+        <div className="perfil-card">
+          {Object.keys(usuario).map((key) => (
+            <div className="perfil-row" key={key}>
+              <div className="perfil-key">{humanizeKey(key)}</div>
+              <div className="perfil-value">{String(usuario[key])}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ export default function MiTienda() {
   const [nombre, setNombre] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
   const [staffMembers, setStaffMembers] = useState([]);
+  const [staffSearch, setStaffSearch] = useState({ user: null, loading: false, error: null });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,6 +49,45 @@ export default function MiTienda() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    const email = staffEmail.trim().toLowerCase();
+
+    if (!email) {
+      setStaffSearch({ user: null, loading: false, error: null });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStaffSearch({ user: null, loading: false, error: "Ingresa un correo válido" });
+      return;
+    }
+
+    let isMounted = true;
+    const searchUser = async () => {
+      setStaffSearch((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const target = await obtenerInformacionUsuarioPorCorreo(email);
+        if (isMounted) {
+          if (target) {
+            setStaffSearch({ user: target, loading: false, error: null });
+          } else {
+            setStaffSearch({ user: null, loading: false, error: "Usuario no encontrado" });
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          setStaffSearch({ user: null, loading: false, error: err.message || "No se pudo buscar el usuario" });
+        }
+      }
+    };
+
+    searchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [staffEmail]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -170,12 +210,24 @@ export default function MiTienda() {
     }
   };
 
-  if (loading) return <p>Cargando...</p>;
+  if (loading) {
+    return (
+      <div className="mi-tienda">
+        <p>Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mi-tienda">
+      <div className="mi-tienda-header">
+        <span className="eyebrow">Tu negocio</span>
+        <h2>Mi Tienda</h2>
+        <p>Administra el nombre de tu tienda y el personal con acceso.</p>
+      </div>
+
       <div className="card">
-        <h2>🏪 Mi Tienda</h2>
+        <h2>🏪 Datos de la tienda</h2>
 
         <label>Nombre de la tienda</label>
 
@@ -220,6 +272,21 @@ export default function MiTienda() {
                   value={staffEmail}
                   onChange={(e) => setStaffEmail(e.target.value)}
                 />
+
+                {staffEmail && (
+                  <div className="staff-search-result">
+                    {staffSearch.loading && <p className="staff-search-loading">Buscando usuario...</p>}
+                    {!staffSearch.loading && staffSearch.error && (
+                      <p className="staff-search-error">{staffSearch.error}</p>
+                    )}
+                    {!staffSearch.loading && staffSearch.user && (
+                      <p className="staff-search-success">
+                        Usuario encontrado: <strong>{staffSearch.user.nombre || staffSearch.user.correo || staffSearch.user.id}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <button onClick={handleAddStaff}>Agregar personal</button>
               </div>
             </div>

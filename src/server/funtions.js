@@ -14,6 +14,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   documentId,
 } from "firebase/firestore";
 import { arrayUnion, arrayRemove } from "firebase/firestore";
@@ -222,6 +223,32 @@ export async function obtenerTipoInventarioPorId(idTipo) {
   const snap = await getDoc(doc(db, "tipos_inventario", idTipo));
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() };
+}
+
+/**
+ * Actualiza el nombre y/o las categorías de un tipo de inventario existente.
+ * @param {string} idTipo
+ * @param {string} nombre
+ * @param {Array} categorias
+ */
+export async function actualizarTipoInventario(idTipo, nombre, categorias = []) {
+  if (!idTipo) throw new Error("ID de tipo de inventario requerido");
+
+  await updateDoc(doc(db, "tipos_inventario", idTipo), {
+    nombre,
+    categorias,
+    updatedAt: new Date(),
+  });
+}
+
+/**
+ * Elimina un tipo de inventario por su id.
+ * @param {string} idTipo
+ */
+export async function eliminarTipoInventario(idTipo) {
+  if (!idTipo) throw new Error("ID de tipo de inventario requerido");
+
+  await deleteDoc(doc(db, "tipos_inventario", idTipo));
 }
 
 export async function obtenerInventariosPorTienda(idTienda) {
