@@ -84,6 +84,22 @@ function formatDate(ts) {
   });
 }
 
+function sortInventariosPorFecha(inventarios = []) {
+  return [...inventarios].sort((a, b) => {
+    const getTime = (item) => {
+      const raw = item?.updatedAt || item?.createdAt || item?.created_at || item?.updated_at;
+      if (!raw) return 0;
+      if (typeof raw?.toDate === "function") return raw.toDate().getTime();
+      if (typeof raw === "number") return raw;
+      if (raw?.seconds) return raw.seconds * 1000;
+      const parsed = new Date(raw).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    return getTime(b) - getTime(a);
+  });
+}
+
 export default function InventariosGuardados() {
   const [user, setUser] = useState(null);
   const [tiendaId, setTiendaId] = useState(null);
@@ -108,7 +124,7 @@ export default function InventariosGuardados() {
 
       if (tienda) {
         const list = await obtenerInventariosPorTienda(tienda);
-        setInventarios(list);
+        setInventarios(sortInventariosPorFecha(list));
       }
       setLoading(false);
     };
@@ -167,7 +183,7 @@ export default function InventariosGuardados() {
       });
       showToast("Inventario actualizado correctamente", "success");
       const list = await obtenerInventariosPorTienda(tiendaId);
-      setInventarios(list);
+      setInventarios(sortInventariosPorFecha(list));
       const updated = await obtenerInventarioPorId(selectedInventario.id);
       setSelectedInventario(updated);
       setModoEdicion(false);
