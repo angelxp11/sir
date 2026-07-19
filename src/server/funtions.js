@@ -5,6 +5,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth, db } from "./server";
+import { convertToUnits, normalizeItemConfig } from "../utils/inventarioConversion";
 import {
   doc,
   getDoc,
@@ -279,10 +280,22 @@ export async function crearInventarioDesdeTipo(tipoInventarioId, tiendaId, usuar
     items: (cat.items || []).map((item) => {
       const key = `${cat.nombre}||${item.nombre}`;
       const detail = itemDetails[key] || { bodega: "", linea: "" };
+      const normalizedItem = normalizeItemConfig(item);
+      const bodegaModo = detail?.bodegaModoRegistro || detail?.modoRegistro || normalizedItem.tipoUnidad;
+      const lineaModo = detail?.lineaModoRegistro || detail?.modoRegistro || normalizedItem.tipoUnidad;
+      const bodegaUnidades = convertToUnits(detail.bodega || "", normalizedItem, bodegaModo);
+      const lineaUnidades = convertToUnits(detail.linea || "", normalizedItem, lineaModo);
       return {
         nombre: item.nombre,
-        bodega: detail.bodega || "",
-        linea: detail.linea || "",
+        bodega: bodegaUnidades,
+        linea: lineaUnidades,
+        bodegaOriginal: detail.bodega || "",
+        lineaOriginal: detail.linea || "",
+        bodegaModoRegistro: bodegaModo,
+        lineaModoRegistro: lineaModo,
+        modoRegistro: bodegaModo === lineaModo ? bodegaModo : null,
+        tipoUnidad: normalizedItem.tipoUnidad,
+        equivalenciaUnidades: normalizedItem.equivalenciaUnidades,
       };
     }),
   }));

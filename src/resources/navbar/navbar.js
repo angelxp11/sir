@@ -33,15 +33,27 @@ const Navbar = ({ onLogout, usuario, onNavigate, activeView }) => {
   const toggleCollapse = () => setIsCollapsed((prev) => !prev);
 
   useEffect(() => {
-    document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+    if (typeof window === 'undefined') return;
+
+    const isMobile = window.innerWidth <= 768;
+    document.body.classList.toggle('sidebar-collapsed', isMobile && isCollapsed);
   }, [isCollapsed]);
 
   const handleNav = (e, view) => {
     e.preventDefault();
     if (onNavigate) onNavigate(view);
+    // En móvil el sidebar se despliega sobre el contenido, así que
+    // al elegir una opción lo volvemos a contraer.
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      setIsCollapsed(true);
+    }
   };
 
   return (
+    <>
+    {!isCollapsed && (
+      <div className="sidebar-backdrop" onClick={() => setIsCollapsed(true)} />
+    )}
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <a
@@ -87,6 +99,7 @@ const Navbar = ({ onLogout, usuario, onNavigate, activeView }) => {
         </button>
       </div>
     </aside>
+    </>
   );
 };
 

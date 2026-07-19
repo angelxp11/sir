@@ -244,17 +244,97 @@ body.sidebar-collapsed {
   border-left-color: #dc2626;
 }
 
-/* ======== RESPONSIVE ======== */
-@media (max-width: 768px) and (min-width: 481px) {
-  .sidebar {
-    width: var(--sidebar-width);
+/* ======== BACKDROP ======== */
+.sidebar-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 998;
+  backdrop-filter: blur(1px);
+}
+
+/* ======== RESPONSIVE — MOBILE: sidebar becomes a top strip ======== */
+@media (max-width: 768px) {
+  /* content no longer needs to leave room on the left */
+  body {
+    --sidebar-margin: 0px;
+    --topbar-height: 60px;
   }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    max-height: 100vh;
+    flex-direction: column;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    transition: height 0.25s ease;
+  }
+
+  /* collapsed = thin strip, only the header row is visible */
+  .sidebar.collapsed {
+    height: var(--topbar-height);
+    overflow: hidden;
+  }
+
+  /* expanded = drops down and overlays the content below it */
+  .sidebar:not(.collapsed) {
+    height: auto;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar-header {
+    flex-direction: row !important;
+    gap: 0.5rem;
+  }
+
+  /* keep the brand text visible even in the collapsed strip */
+  .sidebar.collapsed .sidebar-brand span {
+    display: inline;
+  }
+
+  .sidebar.collapsed .sidebar-nav,
+  .sidebar.collapsed .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar:not(.collapsed) .sidebar-link {
+    justify-content: flex-start;
+    padding: 0.75rem;
+  }
+
+  .sidebar:not(.collapsed) .sidebar-link span {
+    display: inline;
+  }
+
+  /* chevrons read as "expand down" / "collapse up" instead of left/right */
+  .collapse-btn svg {
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar.collapsed .collapse-btn svg {
+    transform: rotate(-90deg);
+  }
+
+  .sidebar:not(.collapsed) .collapse-btn svg {
+    transform: rotate(90deg);
+  }
+
 }
 
 @media (max-width: 480px) {
-  :root {
-    --sidebar-width: 220px;
-    --sidebar-collapsed: 64px;
+  .sidebar.collapsed {
+    height: 52px;
+  }
+
+  body {
+    --topbar-height: 52px;
   }
 }
 

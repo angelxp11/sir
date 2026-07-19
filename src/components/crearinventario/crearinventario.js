@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./crearinventario.css";
 import { auth } from "../../server/server";
 import {
@@ -8,6 +8,9 @@ import {
   crearInventarioDesdeTipo,
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
+import { convertToUnits, normalizeItemConfig } from "../../utils/inventarioConversion";
+
+const DRAFT_STORAGE_KEY = "sir_crear_inventario_draft";
 
 export default function CrearInventario() {
   const [user, setUser] = useState(null);
@@ -19,6 +22,7 @@ export default function CrearInventario() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -26,6 +30,7 @@ export default function CrearInventario() {
       const current = auth.currentUser;
       if (!current) {
         setLoading(false);
+        setDraftLoaded(true);
         return;
       }
 
@@ -54,15 +59,19 @@ export default function CrearInventario() {
     tipo.categorias.forEach((cat) => {
       (cat.items || []).forEach((item) => {
         const key = `${cat.nombre}||${item.nombre}`;
-        details[key] = { bodega: "", linea: "" };
+        const normalizedItem = normalizeItemConfig(item);
+        details[key] = {
+          bodega: "",
+          linea: "",
+          bodegaModoRegistro: normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad",
+          lineaModoRegistro: normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad",
+        };
       });
     });
     return details;
   };
 
-  const handleSelectTipo = async (tipoId) => {
-    setSelectedTipoId(tipoId);
-    setExpandedCategories({});
+  const loadTipoDetalle = useCallback(async (tipoId, initialItemDetails = null) => {
     if (!tipoId) {
       setTipoDetalle(null);
       setItemDetails({});
@@ -71,14 +80,20 @@ export default function CrearInventario() {
 
     const tipo = await obtenerTipoInventarioPorId(tipoId);
     setTipoDetalle(tipo);
-    setItemDetails(initializeItemDetails(tipo));
+    setItemDetails(initialItemDetails || initializeItemDetails(tipo));
+  }, []);
+
+  const handleSelectTipo = async (tipoId) => {
+    setSelectedTipoId(tipoId);
+    setExpandedCategories({});
+    await loadTipoDetalle(tipoId);
   };
 
   const handleDetailChange = (key, field, value) => {
     setItemDetails((current) => ({
       ...current,
       [key]: {
-        ...current[key],
+        ...(current[key] || {}),
         [field]: value,
       },
     }));
@@ -90,6 +105,54 @@ export default function CrearInventario() {
       [categoriaNombre]: !current[categoriaNombre],
     }));
   };
+
+  useEffect(() => {
+    if (!draftLoaded || !user) return;
+
+    const payload = {
+      selectedTipoId,
+      itemDetails,
+      expandedCategories,
+      updatedAt: Date.now(),
+    };
+
+    if (!selectedTipoId && !Object.keys(itemDetails).length && !Object.keys(expandedCategories).length) {
+      window.localStorage.removeItem(`${DRAFT_STORAGE_KEY}:${user?.id || user?.uid || "guest"}`);
+      return;
+    }
+
+    window.localStorage.setItem(
+      `${DRAFT_STORAGE_KEY}:${user?.id || user?.uid || "guest"}`,
+      JSON.stringify(payload)
+    );
+  }, [draftLoaded, expandedCategories, itemDetails, selectedTipoId, user]);
+
+  useEffect(() => {
+    if (!user || draftLoaded || loading) return;
+
+    try {
+      const rawDraft = window.localStorage.getItem(`${DRAFT_STORAGE_KEY}:${user?.id || user?.uid || "guest"}`);
+      if (!rawDraft) {
+        setDraftLoaded(true);
+        return;
+      }
+
+      const parsed = JSON.parse(rawDraft);
+      if (parsed.selectedTipoId) {
+        setSelectedTipoId(parsed.selectedTipoId);
+        setExpandedCategories(parsed.expandedCategories || {});
+        setItemDetails(parsed.itemDetails || {});
+        loadTipoDetalle(parsed.selectedTipoId, parsed.itemDetails || {});
+      } else if (parsed.itemDetails) {
+        setItemDetails(parsed.itemDetails || {});
+        setExpandedCategories(parsed.expandedCategories || {});
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setDraftLoaded(true);
+    }
+  }, [draftLoaded, loadTipoDetalle, loading, user]);
 
   const getCategoriaCounts = (categoria) => {
     if (!categoria?.items) return null;
@@ -150,6 +213,9 @@ export default function CrearInventario() {
       setSelectedTipoId("");
       setItemDetails({});
       setExpandedCategories({});
+      if (user) {
+        window.localStorage.removeItem(`${DRAFT_STORAGE_KEY}:${user?.id || user?.uid || "guest"}`);
+      }
     } catch (error) {
       console.error(error);
       showToast("Error creando el inventario.", "error");
@@ -159,11 +225,11 @@ export default function CrearInventario() {
   };
 
   if (loading) {
-    return <div className="crear-inventario">Cargando...</div>;
+    return <div className="crear-inventario"><p className="state-message">Cargando...</p></div>;
   }
 
   if (!user) {
-    return <div className="crear-inventario">Necesitas iniciar sesión para ver esta sección.</div>;
+    return <div className="crear-inventario"><p className="state-message">Necesitas iniciar sesión para ver esta sección.</p></div>;
   }
 
   if (!tiendaId) {
@@ -180,6 +246,22 @@ export default function CrearInventario() {
       <div className="inventario-card">
         <h2>Crear inventario</h2>
         <p>Selecciona un tipo de inventario y registra BODEGA y LINEA para cada item.</p>
+        <div className="hint-row">
+          <span className="draft-hint">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path d="M10 5v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="10" cy="10" r="7.2" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+            El borrador se guarda automáticamente en tu dispositivo
+          </span>
+          <span className="draft-hint">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path d="M4 7l6-3 6 3-6 3-6-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 7v6l6 3 6-3V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Si eliges paquete, convertimos la cantidad a unidades automáticamente
+          </span>
+        </div>
 
         <label>Tipo de inventario</label>
         <select
@@ -200,18 +282,21 @@ export default function CrearInventario() {
               const isExpanded = expandedCategories[categoria.nombre];
               const counts = getCategoriaCounts(categoria);
 
+              const isComplete = counts?.type === "progreso" && counts.bodega === counts.total && counts.linea === counts.total;
+
               return (
-                <div className="categoria-accordion" key={categoria.nombre}>
+                <div className={`categoria-accordion ${isExpanded ? "is-expanded" : ""}`} key={categoria.nombre}>
                   <button
                     className="categoria-header"
                     onClick={() => toggleCategory(categoria.nombre)}
                     type="button"
+                    aria-expanded={!!isExpanded}
                   >
                     <span className="categoria-toggle">
                       <svg
                         className={`toggle-icon ${isExpanded ? "expanded" : ""}`}
-                        width="20"
-                        height="20"
+                        width="18"
+                        height="18"
                         viewBox="0 0 20 20"
                         fill="none"
                       >
@@ -224,21 +309,52 @@ export default function CrearInventario() {
                         />
                       </svg>
                     </span>
-                    <h4>{categoria.nombre}</h4>
+                    <span className="categoria-title">
+                      <h4>{categoria.nombre}</h4>
+                      <span className="categoria-item-count">{(categoria.items || []).length} items</span>
+                    </span>
                     {counts && (
                       <>
                         {counts.type === "incompleto" ? (
                           <span className="incomplete-badge">
-                            {counts.count} incompletos
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="none">
+                              <circle cx="10" cy="10" r="7.2" stroke="currentColor" strokeWidth="1.8" />
+                              <path d="M10 6.5v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                              <circle cx="10" cy="13" r="0.9" fill="currentColor" />
+                            </svg>
+                            {counts.count} sin datos
                           </span>
                         ) : (
-                          <div className="progress-badge">
-                            <span className="progress-item bodega-progress">
-                              Bodega: <strong>{counts.bodega}/{counts.total}</strong>
-                            </span>
-                            <span className="progress-item linea-progress">
-                              Linea: <strong>{counts.linea}/{counts.total}</strong>
-                            </span>
+                          <div className="progress-wrap">
+                            <div className="progress-bars">
+                              <div className="progress-bar-item">
+                                <span className="progress-bar-label">Bod.</span>
+                                <div className="progress-bar-track">
+                                  <div
+                                    className="progress-bar-fill bodega-fill"
+                                    style={{ width: `${counts.total ? (counts.bodega / counts.total) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="progress-bar-count">{counts.bodega}/{counts.total}</span>
+                              </div>
+                              <div className="progress-bar-item">
+                                <span className="progress-bar-label">Lín.</span>
+                                <div className="progress-bar-track">
+                                  <div
+                                    className="progress-bar-fill linea-fill"
+                                    style={{ width: `${counts.total ? (counts.linea / counts.total) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="progress-bar-count">{counts.linea}/{counts.total}</span>
+                              </div>
+                            </div>
+                            {isComplete && (
+                              <span className="completo-check" title="Categoría completa">
+                                <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+                                  <path d="M5 10.5l3.2 3.2L15 6.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </span>
+                            )}
                           </div>
                         )}
                       </>
@@ -249,26 +365,94 @@ export default function CrearInventario() {
                     <div className="categoria-content">
                       {(categoria.items || []).map((item) => {
                         const key = `${categoria.nombre}||${item.nombre}`;
-                        const detail = itemDetails[key] || { bodega: "", linea: "" };
+                        const normalizedItem = normalizeItemConfig(item);
+                        const detail = itemDetails[key] || {
+                          bodega: "",
+                          linea: "",
+                          bodegaModoRegistro: normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad",
+                          lineaModoRegistro: normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad",
+                        };
+                        const bodegaMode = detail.bodegaModoRegistro || detail.modoRegistro || (normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad");
+                        const lineaMode = detail.lineaModoRegistro || detail.modoRegistro || (normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad");
+                        const previewBodega = convertToUnits(detail.bodega || "", normalizedItem, bodegaMode);
+                        const previewLinea = convertToUnits(detail.linea || "", normalizedItem, lineaMode);
+                        const packageHint = normalizedItem.tipoUnidad === "paquete"
+                          ? `1 paquete = ${normalizedItem.equivalenciaUnidades} unidades`
+                          : "Se registra en unidades";
                         return (
                           <div className="item-row" key={key}>
-                            <span>{item.nombre}</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              pattern="[0-9]*[.,]?[0-9]*"
-                              value={detail.bodega}
-                              onChange={(e) => handleDetailChange(key, "bodega", e.target.value.replace(/[^0-9.,]/g, ""))}
-                              placeholder="BODEGA"
-                            />
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              pattern="[0-9]*[.,]?[0-9]*"
-                              value={detail.linea}
-                              onChange={(e) => handleDetailChange(key, "linea", e.target.value.replace(/[^0-9.,]/g, ""))}
-                              placeholder="LINEA"
-                            />
+                            <span className="item-name">{item.nombre}</span>
+                            <div className="item-input-stack field-bodega">
+                              <div className="mode-toggle">
+                                <span className="field-label">
+                                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+                                    <path d="M3 6.5l7-3.2 7 3.2-7 3.2-7-3.2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M3 6.5v7l7 3.2 7-3.2v-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                  Bodega
+                                </span>
+                                <label className="toggle-switch">
+                                  <input
+                                    type="checkbox"
+                                    checked={bodegaMode === "paquete"}
+                                    onChange={(e) => handleDetailChange(key, "bodegaModoRegistro", e.target.checked ? "paquete" : "unidad")}
+                                  />
+                                  <span className="toggle-slider" />
+                                  <span className="toggle-label">{bodegaMode === "paquete" ? "Paquete" : "Unidad"}</span>
+                                </label>
+                              </div>
+                              <small className="conversion-hint">
+                                {bodegaMode === "paquete" ? packageHint : "Se registra en unidades"}
+                              </small>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*[.,]?[0-9]*"
+                                value={detail.bodega}
+                                onChange={(e) => handleDetailChange(key, "bodega", e.target.value.replace(/[^0-9.,]/g, ""))}
+                                placeholder={bodegaMode === "paquete" ? "Paquetes" : "Unidades"}
+                              />
+                              <small className="conversion-hint">
+                                {bodegaMode === "paquete"
+                                  ? `Equivale a ${previewBodega}${previewBodega === "" ? "" : " unidades"}`
+                                  : "Se registra en unidades"}
+                              </small>
+                            </div>
+                            <div className="item-input-stack field-linea">
+                              <div className="mode-toggle">
+                                <span className="field-label">
+                                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+                                    <path d="M3 5h14M3 10h10M3 15h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                  </svg>
+                                  Línea
+                                </span>
+                                <label className="toggle-switch">
+                                  <input
+                                    type="checkbox"
+                                    checked={lineaMode === "paquete"}
+                                    onChange={(e) => handleDetailChange(key, "lineaModoRegistro", e.target.checked ? "paquete" : "unidad")}
+                                  />
+                                  <span className="toggle-slider" />
+                                  <span className="toggle-label">{lineaMode === "paquete" ? "Paquete" : "Unidad"}</span>
+                                </label>
+                              </div>
+                              <small className="conversion-hint">
+                                {lineaMode === "paquete" ? packageHint : "Se registra en unidades"}
+                              </small>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*[.,]?[0-9]*"
+                                value={detail.linea}
+                                onChange={(e) => handleDetailChange(key, "linea", e.target.value.replace(/[^0-9.,]/g, ""))}
+                                placeholder={lineaMode === "paquete" ? "Paquetes" : "Unidades"}
+                              />
+                              <small className="conversion-hint">
+                                {lineaMode === "paquete"
+                                  ? `Equivale a ${previewLinea}${previewLinea === "" ? "" : " unidades"}`
+                                  : "Se registra en unidades"}
+                              </small>
+                            </div>
                           </div>
                         );
                       })}
@@ -277,12 +461,22 @@ export default function CrearInventario() {
                 </div>
               );
             })}
-            <button className="btn" type="button" onClick={handleCreateInventario} disabled={saving}>
-              {saving ? "Guardando inventario..." : "Guardar inventario"}
-            </button>
+            <div className="save-bar">
+              <button className="btn" type="button" onClick={handleCreateInventario} disabled={saving}>
+                {saving && <span className="spinner" />}
+                {saving ? "Guardando inventario..." : "Guardar inventario"}
+              </button>
+            </div>
           </div>
         ) : (
-          <p>Selecciona un tipo para ver sus categorías e items.</p>
+          <div className="empty-state">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 8v8l8 4 8-4V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 12v8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <p>Selecciona un tipo para ver sus categorías e items.</p>
+          </div>
         )}
       </div>
     </div>

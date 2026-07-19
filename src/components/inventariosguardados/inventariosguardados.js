@@ -8,7 +8,8 @@ import {
   actualizarInventario,
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
-import { buildInventarioPayload } from "./inventariosguardadosUtils";
+import { buildInventarioPayload, buildItemDetailsMap, getItemDetailState } from "./inventariosguardadosUtils";
+import { convertToUnits, normalizeItemConfig } from "../../utils/inventarioConversion";
 
 const getKey = (categoriaNombre, itemNombre) => `${categoriaNombre}||${itemNombre}`;
 
@@ -54,6 +55,41 @@ function CheckIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function BoxIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 8l-9-5-9 5 9 5 9-5z" />
+      <path d="M3 8v8l9 5 9-5V8" />
+      <path d="M12 13v8" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21v-1a7 7 0 0 1 16 0v1" />
+    </svg>
+  );
+}
+
+function PencilSmallIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
 }
@@ -135,7 +171,7 @@ export default function InventariosGuardados() {
     const inventario = await obtenerInventarioPorId(inventarioId);
     setSelectedInventario(inventario);
     setModoEdicion(false);
-    setItemDetails(inventario?.itemDetails || {});
+    setItemDetails(buildItemDetailsMap(inventario, inventario?.itemDetails || {}));
     setCopiado(false);
   };
 
@@ -213,7 +249,7 @@ export default function InventariosGuardados() {
 
         {inventarios.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📦</div>
+            <div className="empty-icon"><BoxIcon size={26} /></div>
             <p>No hay inventarios aún.</p>
           </div>
         ) : (
@@ -225,12 +261,15 @@ export default function InventariosGuardados() {
                   className={`inv-btn${selectedInventario?.id === inv.id ? " active" : ""}`}
                   onClick={() => handleSelectInventario(inv.id)}
                 >
-                  <span className="inv-btn-title">
-                    {inv.nombreInventario || inv.tipoInventarioNombre || "Inventario"}
-                  </span>
-                  <span className="inv-btn-meta">
-                    {inv.createdByName || ""}
-                    {inv.createdAt ? ` · ${formatDate(inv.createdAt)}` : ""}
+                  <span className="inv-btn-icon"><BoxIcon size={16} /></span>
+                  <span className="inv-btn-text">
+                    <span className="inv-btn-title">
+                      {inv.nombreInventario || inv.tipoInventarioNombre || "Inventario"}
+                    </span>
+                    <span className="inv-btn-meta">
+                      {inv.createdByName || ""}
+                      {inv.createdAt ? ` · ${formatDate(inv.createdAt)}` : ""}
+                    </span>
                   </span>
                 </button>
               </li>
@@ -248,10 +287,10 @@ export default function InventariosGuardados() {
                 <h3>{selectedInventario.nombreInventario || selectedInventario.tipoInventarioNombre}</h3>
                 <div className="detail-meta">
                   {selectedInventario.createdByName && (
-                    <span className="meta-badge">👤 {selectedInventario.createdByName}</span>
+                    <span className="meta-badge"><UserIcon /> {selectedInventario.createdByName}</span>
                   )}
                   {selectedInventario.updatedByName && (
-                    <span className="meta-badge">✏️ {selectedInventario.updatedByName}</span>
+                    <span className="meta-badge"><PencilSmallIcon /> {selectedInventario.updatedByName}</span>
                   )}
                 </div>
               </div>
@@ -297,7 +336,7 @@ export default function InventariosGuardados() {
             </div>
 
             {selectedInventario.tipoInventarioNombre && (
-              <span className="tipo-badge">{selectedInventario.tipoInventarioNombre}</span>
+              <span className="tipo-badge"><BoxIcon size={12} /> {selectedInventario.tipoInventarioNombre}</span>
             )}
 
             {(selectedInventario.categorias || []).map((categoria) => (
@@ -305,14 +344,38 @@ export default function InventariosGuardados() {
                 <h4>{categoria.nombre}</h4>
                 {(categoria.items || []).map((item) => {
                   const key = getKey(categoria.nombre, item.nombre);
-                  const detail = itemDetails[key] || { bodega: item.bodega || "", linea: item.linea || "" };
+                  const normalizedItem = normalizeItemConfig(item);
+                  const detail = getItemDetailState(item, itemDetails[key] || {});
+                  const bodegaMode = detail.bodegaModoRegistro || detail.modoRegistro || (normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad");
+                  const lineaMode = detail.lineaModoRegistro || detail.modoRegistro || (normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad");
+                  const bodegaDisplayValue = convertToUnits(detail.bodega || "", normalizedItem, bodegaMode);
+                  const lineaDisplayValue = convertToUnits(detail.linea || "", normalizedItem, lineaMode);
+                  const packageHint = normalizedItem.tipoUnidad === "paquete"
+                    ? `1 paquete = ${normalizedItem.equivalenciaUnidades} unidades`
+                    : "Se registra en unidades";
                   return (
                     <div className="item-row" key={key}>
                       <span className="item-name">{item.nombre}</span>
                       {modoEdicion ? (
                         <>
                           <div className="input-group">
-                            <span className="input-label">Bodega</span>
+                            <div className="mode-toggle">
+                              <span className="input-label">Bodega</span>
+                              <label className="toggle-switch">
+                                <input
+                                  type="checkbox"
+                                  checked={bodegaMode === "paquete"}
+                                  onChange={(event) =>
+                                    handleDetailChange(key, "bodegaModoRegistro", event.target.checked ? "paquete" : "unidad")
+                                  }
+                                />
+                                <span className="toggle-slider" />
+                                <span className="toggle-label">{bodegaMode === "paquete" ? "Paquete" : "Unidad"}</span>
+                              </label>
+                            </div>
+                            <small className="conversion-hint">
+                              {bodegaMode === "paquete" ? packageHint : "Se registra en unidades"}
+                            </small>
                             <input
                               className="inv-input"
                               type="text"
@@ -322,11 +385,32 @@ export default function InventariosGuardados() {
                               onChange={(e) =>
                                 handleDetailChange(key, "bodega", e.target.value.replace(/[^0-9.,]/g, ""))
                               }
-                              placeholder="0"
+                              placeholder={bodegaMode === "paquete" ? "Paquetes" : "Unidades"}
                             />
+                            <small className="conversion-hint">
+                              {bodegaMode === "paquete"
+                                ? `Equivale a ${bodegaDisplayValue}${bodegaDisplayValue === "" ? "" : " unidades"}`
+                                : "Se registra en unidades"}
+                            </small>
                           </div>
                           <div className="input-group">
-                            <span className="input-label">Línea</span>
+                            <div className="mode-toggle">
+                              <span className="input-label">Línea</span>
+                              <label className="toggle-switch">
+                                <input
+                                  type="checkbox"
+                                  checked={lineaMode === "paquete"}
+                                  onChange={(event) =>
+                                    handleDetailChange(key, "lineaModoRegistro", event.target.checked ? "paquete" : "unidad")
+                                  }
+                                />
+                                <span className="toggle-slider" />
+                                <span className="toggle-label">{lineaMode === "paquete" ? "Paquete" : "Unidad"}</span>
+                              </label>
+                            </div>
+                            <small className="conversion-hint">
+                              {lineaMode === "paquete" ? packageHint : "Se registra en unidades"}
+                            </small>
                             <input
                               className="inv-input"
                               type="text"
@@ -336,19 +420,24 @@ export default function InventariosGuardados() {
                               onChange={(e) =>
                                 handleDetailChange(key, "linea", e.target.value.replace(/[^0-9.,]/g, ""))
                               }
-                              placeholder="0"
+                              placeholder={lineaMode === "paquete" ? "Paquetes" : "Unidades"}
                             />
+                            <small className="conversion-hint">
+                              {lineaMode === "paquete"
+                                ? `Equivale a ${lineaDisplayValue}${lineaDisplayValue === "" ? "" : " unidades"}`
+                                : "Se registra en unidades"}
+                            </small>
                           </div>
                         </>
                       ) : (
                         <div className="item-values-row">
                           <span className="value-chip chip-bodega">
                             <span className="chip-label">B</span>
-                            {detail.bodega || "—"}
+                            {bodegaDisplayValue || "—"}
                           </span>
                           <span className="value-chip chip-linea">
                             <span className="chip-label">L</span>
-                            {detail.linea || "—"}
+                            {lineaDisplayValue || "—"}
                           </span>
                         </div>
                       )}
@@ -371,7 +460,7 @@ export default function InventariosGuardados() {
           </>
         ) : (
           <div className="detail-empty">
-            <div className="empty-icon">🗂️</div>
+            <div className="empty-icon"><FolderIcon /></div>
             <p>Selecciona un inventario para ver sus detalles.</p>
           </div>
         )}

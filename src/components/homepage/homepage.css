@@ -8,12 +8,17 @@
   min-height: 100vh;
   font-family: var(--font-body, Arial, sans-serif);
   background: var(--color-bg, #f6f8fb);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .main-content {
-  margin-left: var(--sidebar-margin, 260px);
   transition: margin-left 0.25s ease;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ======== QUICK ACTIONS (mirrors the sidebar) ======== */
@@ -134,6 +139,9 @@
 
 .view-section {
   padding: 32px 8% 60px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .back-btn {
@@ -161,10 +169,22 @@
 /* ======== TABLET ======== */
 
 @media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+
   .quick-actions-section,
   .view-section {
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: 20px;
+    padding-right: 20px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .view-section {
+    padding-top: 20px;
+    padding-bottom: 60px;
   }
 
   .quick-actions {
