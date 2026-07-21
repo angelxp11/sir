@@ -5,14 +5,69 @@ export function normalizeMeasurementMode(value, fallback = "unidad") {
   return fallback === "paquete" ? "paquete" : "unidad";
 }
 
+export function getItemStorageKey(categoriaNombre, item = {}) {
+  if (item?.id) return `id:${item.id}`;
+  return `${categoriaNombre}||${item?.nombre || ""}`;
+}
+
+export function getItemReferenceId(item = {}) {
+  if (item?.id) return item.id;
+
+  const rawValue = item?.equivalenciaUnidades;
+  if (typeof rawValue === "string" && rawValue.trim()) {
+    const numericValue = Number(rawValue.replace(/,/g, "."));
+    if (!Number.isFinite(numericValue)) return rawValue.trim();
+  }
+
+  return "";
+}
+
+export function buildItemConfigOverrides(categorias = []) {
+  const overrides = {};
+
+  (categorias || []).forEach((categoria) => {
+    (categoria.items || []).forEach((item) => {
+      if (!item?.id) return;
+      const normalizedItem = normalizeItemConfig(item);
+      overrides[item.id] = {
+        tipoUnidad: normalizedItem.tipoUnidad,
+        equivalenciaUnidades: normalizedItem.equivalenciaUnidades,
+      };
+    });
+  });
+
+  return overrides;
+}
+
+export function applySharedItemConfigs(categorias = [], overrides = {}) {
+  return (categorias || []).map((categoria) => ({
+    ...categoria,
+    items: (categoria.items || []).map((item) => {
+      if (!item?.id || !overrides[item.id]) return item;
+      const normalizedItem = normalizeItemConfig(item);
+      return {
+        ...item,
+        tipoUnidad: overrides[item.id].tipoUnidad || normalizedItem.tipoUnidad,
+        equivalenciaUnidades: overrides[item.id].equivalenciaUnidades ?? normalizedItem.equivalenciaUnidades,
+      };
+    }),
+  }));
+}
+
 export function normalizeItemConfig(item = {}) {
   const tipoUnidad = normalizeMeasurementMode(item?.tipoUnidad, "unidad");
-  const equivalenciaUnidades = Number(item?.equivalenciaUnidades || 0);
+  const rawEquivalencia = item?.equivalenciaUnidades;
+  const parsedEquivalencia = typeof rawEquivalencia === "number"
+    ? rawEquivalencia
+    : Number(String(rawEquivalencia ?? "").replace(/,/g, "."));
+  const equivalenciaUnidades = Number.isFinite(parsedEquivalencia) && parsedEquivalencia > 0
+    ? parsedEquivalencia
+    : 1;
 
   return {
     ...item,
     tipoUnidad,
-    equivalenciaUnidades: Number.isFinite(equivalenciaUnidades) && equivalenciaUnidades > 0 ? equivalenciaUnidades : 1,
+    equivalenciaUnidades,
   };
 }
 

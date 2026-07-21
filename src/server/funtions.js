@@ -5,7 +5,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth, db } from "./server";
-import { convertToUnits, normalizeItemConfig } from "../utils/inventarioConversion";
+import { convertToUnits, normalizeItemConfig, getItemStorageKey, getItemReferenceId, buildItemConfigOverrides, applySharedItemConfigs } from "../utils/inventarioConversion";
 import {
   doc,
   getDoc,
@@ -196,6 +196,49 @@ export async function asegurarRolGerente(uid) {
     await updateDoc(ref, { rol: "GERENTE" });
   }
 }
+async function sincronizarItemsCompartidos(idTienda, categorias = [], tipoIdExcluido = null) {
+  if (!idTienda || !Array.isArray(categorias)) return;
+
+  const overrides = buildItemConfigOverrides(categorias);
+  if (!Object.keys(overrides).length) return;
+
+  const q = query(collection(db, "tipos_inventario"), where("tiendaId", "==", idTienda));
+  const snap = await getDocs(q);
+
+  const updates = [];
+  snap.docs.forEach((docSnap) => {
+    if (docSnap.id === tipoIdExcluido) return;
+
+    const tipoData = docSnap.data() || {};
+    const categoriasActuales = Array.isArray(tipoData.categorias) ? tipoData.categorias : [];
+    const categoriasSincronizadas = applySharedItemConfigs(categoriasActuales, overrides);
+
+    let changed = false;
+    categoriasActuales.forEach((categoria, catIndex) => {
+      (categoria.items || []).forEach((item, itemIndex) => {
+        if (!item?.id || !overrides[item.id]) return;
+        const nextItem = categoriasSincronizadas[catIndex]?.items?.[itemIndex];
+        if (!nextItem) return;
+        if (
+          nextItem.tipoUnidad !== item.tipoUnidad ||
+          nextItem.equivalenciaUnidades !== item.equivalenciaUnidades
+        ) {
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      updates.push(updateDoc(doc(db, "tipos_inventario", docSnap.id), {
+        categorias: categoriasSincronizadas,
+        updatedAt: new Date(),
+      }));
+    }
+  });
+
+  await Promise.all(updates);
+}
+
 export async function crearTipoInventario(idTienda, nombre, categorias = []) {
   if (!idTienda || !nombre) throw new Error("ID de tienda y nombre requeridos");
 
@@ -206,6 +249,8 @@ export async function crearTipoInventario(idTienda, nombre, categorias = []) {
     fechaCreacion: new Date(),
     activa: true,
   };
+
+  await sincronizarItemsCompartidos(idTienda, categorias);
 
   const ref = await addDoc(collection(db, "tipos_inventario"), data);
   return ref.id;
@@ -234,6 +279,11 @@ export async function obtenerTipoInventarioPorId(idTipo) {
  */
 export async function actualizarTipoInventario(idTipo, nombre, categorias = []) {
   if (!idTipo) throw new Error("ID de tipo de inventario requerido");
+
+  const tipoActual = await obtenerTipoInventarioPorId(idTipo);
+  if (tipoActual?.tiendaId) {
+    await sincronizarItemsCompartidos(tipoActual.tiendaId, categorias, idTipo);
+  }
 
   await updateDoc(doc(db, "tipos_inventario", idTipo), {
     nombre,
@@ -278,7 +328,7 @@ export async function crearInventarioDesdeTipo(tipoInventarioId, tiendaId, usuar
   const categorias = (tipo.categorias || []).map((cat) => ({
     nombre: cat.nombre,
     items: (cat.items || []).map((item) => {
-      const key = `${cat.nombre}||${item.nombre}`;
+      const key = getItemStorageKey(cat.nombre, item);
       const detail = itemDetails[key] || { bodega: "", linea: "" };
       const normalizedItem = normalizeItemConfig(item);
       const bodegaModo = detail?.bodegaModoRegistro || detail?.modoRegistro || normalizedItem.tipoUnidad;
@@ -286,6 +336,7 @@ export async function crearInventarioDesdeTipo(tipoInventarioId, tiendaId, usuar
       const bodegaUnidades = convertToUnits(detail.bodega || "", normalizedItem, bodegaModo);
       const lineaUnidades = convertToUnits(detail.linea || "", normalizedItem, lineaModo);
       return {
+        id: getItemReferenceId(item) || item.id,
         nombre: item.nombre,
         bodega: bodegaUnidades,
         linea: lineaUnidades,

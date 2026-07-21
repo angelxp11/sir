@@ -1,6 +1,6 @@
-import { convertToUnits, normalizeItemConfig, normalizeMeasurementMode } from "../../utils/inventarioConversion";
+import { convertToUnits, normalizeItemConfig, normalizeMeasurementMode, getItemStorageKey } from "../../utils/inventarioConversion";
 
-const getKey = (categoriaNombre, itemNombre) => `${categoriaNombre}||${itemNombre}`;
+const getKey = (categoriaNombre, item) => getItemStorageKey(categoriaNombre, item);
 
 export function normalizeExportMode(value) {
   if (typeof value !== "string") return null;
@@ -29,7 +29,7 @@ export function buildItemDetailsMap(inventario = {}, existingItemDetails = {}) {
 
   (inventario.categorias || []).forEach((categoria) => {
     (categoria.items || []).forEach((item) => {
-      const key = getKey(categoria.nombre, item.nombre);
+      const key = getKey(categoria.nombre, item);
       details[key] = getItemDetailState(item, existingItemDetails[key] || {});
     });
   });
@@ -43,7 +43,7 @@ export function buildInventarioPayload(inventario, itemDetails, mode = "ambos") 
   const categorias = (inventario.categorias || []).map((categoria) => ({
     nombre: categoria.nombre,
     items: (categoria.items || []).map((item) => {
-      const key = getKey(categoria.nombre, item.nombre);
+      const key = getKey(categoria.nombre, item);
       const detail = itemDetails[key] || { bodega: item.bodega || "", linea: item.linea || "" };
       const normalizedItem = normalizeItemConfig(item);
       const payloadItem = { nombre: item.nombre };

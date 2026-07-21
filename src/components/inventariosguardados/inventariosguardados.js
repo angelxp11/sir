@@ -9,9 +9,9 @@ import {
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
 import { buildInventarioPayload, buildItemDetailsMap, getItemDetailState } from "./inventariosguardadosUtils";
-import { convertToUnits, convertValueBetweenModes, normalizeItemConfig } from "../../utils/inventarioConversion";
+import { convertToUnits, convertValueBetweenModes, normalizeItemConfig, getItemStorageKey } from "../../utils/inventarioConversion";
 
-const getKey = (categoriaNombre, itemNombre) => `${categoriaNombre}||${itemNombre}`;
+const getKey = (categoriaNombre, item) => getItemStorageKey(categoriaNombre, item);
 
 function DownloadIcon() {
   return (
@@ -356,7 +356,7 @@ export default function InventariosGuardados() {
               <section key={categoria.nombre} className="categoria-detail">
                 <h4>{categoria.nombre}</h4>
                 {(categoria.items || []).map((item) => {
-                  const key = getKey(categoria.nombre, item.nombre);
+                  const key = getKey(categoria.nombre, item);
                   const normalizedItem = normalizeItemConfig(item);
                   const detail = getItemDetailState(item, itemDetails[key] || {});
                   const bodegaMode = detail.bodegaModoRegistro || detail.modoRegistro || (normalizedItem.tipoUnidad === "paquete" ? "paquete" : "unidad");

@@ -8,7 +8,7 @@ import {
   crearInventarioDesdeTipo,
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
-import { convertToUnits, convertValueBetweenModes, normalizeItemConfig } from "../../utils/inventarioConversion";
+import { convertToUnits, convertValueBetweenModes, normalizeItemConfig, getItemStorageKey } from "../../utils/inventarioConversion";
 
 const DRAFT_STORAGE_KEY = "sir_crear_inventario_draft";
 
@@ -58,7 +58,7 @@ export default function CrearInventario() {
     const details = {};
     tipo.categorias.forEach((cat) => {
       (cat.items || []).forEach((item) => {
-        const key = `${cat.nombre}||${item.nombre}`;
+        const key = getItemStorageKey(cat.nombre, item);
         const normalizedItem = normalizeItemConfig(item);
         details[key] = {
           bodega: "",
@@ -176,7 +176,7 @@ export default function CrearInventario() {
     let incompletos = 0;
 
     categoria.items.forEach((item) => {
-      const key = `${categoria.nombre}||${item.nombre}`;
+      const key = getItemStorageKey(categoria.nombre, item);
       const detail = itemDetails[key] || { bodega: "", linea: "" };
 
       // Un item es incompleto si AMBOS campos están vacíos
@@ -377,7 +377,7 @@ export default function CrearInventario() {
                   {isExpanded && (
                     <div className="categoria-content">
                       {(categoria.items || []).map((item) => {
-                        const key = `${categoria.nombre}||${item.nombre}`;
+                        const key = getItemStorageKey(categoria.nombre, item);
                         const normalizedItem = normalizeItemConfig(item);
                         const detail = itemDetails[key] || {
                           bodega: "",

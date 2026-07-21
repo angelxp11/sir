@@ -9,7 +9,8 @@ import {
   actualizarTipoInventario,
   eliminarTipoInventario,
 } from "../../server/funtions";
-import { normalizeItemConfig } from "../../utils/inventarioConversion";
+import { normalizeItemConfig, getItemReferenceId } from "../../utils/inventarioConversion";
+import EditarItemModal from "./modaleditar/editar";
 
 const createEmptyItem = () => ({
   id: `${Date.now()}-${Math.random()}`,
@@ -137,6 +138,8 @@ export default function TiposInventario() {
   const [editingTipoId, setEditingTipoId] = useState(null);
   const [deletingTipoId, setDeletingTipoId] = useState(null);
   const [excelFileName, setExcelFileName] = useState("");
+  const [itemToEdit, setItemToEdit] = useState(null);
+  const [editingItem, setEditingItem] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -266,6 +269,46 @@ export default function TiposInventario() {
     XLSX.writeFile(libro, "plantilla_tipo_inventario.xlsx");
   };
 
+  const handleDownloadInventory = (tipo) => {
+    const typeName = (tipo?.nombre || "Inventario").trim() || "Inventario";
+    const rows = [
+      ["ID", "Categoría", "Nombre del item", "Unidad de medida", "Tipo de medida", "Equivalencia por paquete"],
+    ];
+
+    const categoriesToExport = tipo?.categorias || [];
+
+    categoriesToExport.forEach((cat) => {
+      (cat.items || []).forEach((item) => {
+        const normalizedItem = normalizeItemConfig(item);
+        const tipoUnidad = normalizedItem.tipoUnidad || "unidad";
+        const equivalencia = tipoUnidad === "paquete" ? normalizedItem.equivalenciaUnidades || 1 : 1;
+
+        rows.push([
+          getItemReferenceId(item),
+          (cat.nombre || "Sin categoría").trim(),
+          (item.nombre || "").trim(),
+          (item.unidad || "").trim(),
+          tipoUnidad,
+          equivalencia,
+        ]);
+      });
+    });
+
+    const hoja = XLSX.utils.aoa_to_sheet(rows);
+    hoja["!cols"] = [{ wch: 24 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 16 }, { wch: 20 }];
+
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
+    const safeFileName = typeName
+      .normalize("NFD")
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .toLowerCase();
+    XLSX.writeFile(libro, `${safeFileName || "inventario"}.xlsx`);
+    setMessage(`Inventario "${typeName}" descargado como Excel.`);
+  };
+
   const handleExcelFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -295,9 +338,10 @@ export default function TiposInventario() {
 
       for (let i = startIndex; i < rows.length; i += 1) {
         const row = rows[i];
-        const itemName = normalize(row[0]);
+        const itemId = normalize(row[0]) || `${Date.now()}-${Math.random()}`;
+        const itemName = normalize(row[2] || row[0]);
         const categoryName = normalize(row[1]) || "Sin categoría";
-        const unidad = normalize(row[2]);
+        const unidad = normalize(row[3] || row[2]);
 
         if (!itemName) continue;
 
@@ -307,9 +351,10 @@ export default function TiposInventario() {
         }
 
         newCategories[categoryName].push({
-          id: `${Date.now()}-${Math.random()}`,
+          id: itemId,
           nombre: itemName,
           unidad,
+          equivalenciaUnidades: 1,
         });
       }
 
@@ -346,6 +391,7 @@ export default function TiposInventario() {
           .map((item) => {
             const normalizedItem = normalizeItemConfig(item);
             return {
+              id: getItemReferenceId(item) || item.id || null,
               nombre: item.nombre.trim(),
               unidad: (item.unidad || "").trim(),
               tipoUnidad: normalizedItem.tipoUnidad,
@@ -391,28 +437,46 @@ export default function TiposInventario() {
     }
   };
 
+  const normalizeTipoParaEdicion = (tipo) => {
+    const rawCategorias = Array.isArray(tipo?.categorias)
+      ? tipo.categorias
+      : Array.isArray(tipo?.data?.categorias)
+        ? tipo.data.categorias
+        : [];
+
+    if (!rawCategorias.length) {
+      return [createEmptyCategory()];
+    }
+
+    return rawCategorias.map((cat) => {
+      const items = Array.isArray(cat?.items) ? cat.items : [];
+      const normalizedItems = items.length
+        ? items.map((item) => {
+            const normalizedItem = normalizeItemConfig(item);
+            return {
+              id: getItemReferenceId(item) || item.id || `${Date.now()}-${Math.random()}`,
+              nombre: item.nombre || "",
+              unidad: item.unidad || "",
+              tipoUnidad: normalizedItem.tipoUnidad,
+              equivalenciaUnidades: normalizedItem.equivalenciaUnidades,
+            };
+          })
+        : [createEmptyItem()];
+
+      return {
+        id: cat.id || `${Date.now()}-${Math.random()}`,
+        nombre: cat.nombre || "",
+        items: normalizedItems,
+      };
+    });
+  };
+
   const handleEditTipo = (tipo) => {
     setEditingTipoId(tipo.id);
     setTipoNombre(tipo.nombre || "");
-    const cats = tipo.categorias?.length
-      ? tipo.categorias.map((cat) => ({
-          id: `${Date.now()}-${Math.random()}`,
-          nombre: cat.nombre || "",
-          items: cat.items?.length
-            ? cat.items.map((item) => {
-                const normalizedItem = normalizeItemConfig(item);
-                return {
-                  id: `${Date.now()}-${Math.random()}`,
-                  nombre: item.nombre || "",
-                  unidad: item.unidad || "",
-                  tipoUnidad: normalizedItem.tipoUnidad,
-                  equivalenciaUnidades: normalizedItem.equivalenciaUnidades,
-                };
-              })
-            : [createEmptyItem()],
-        }))
-      : [createEmptyCategory()];
-    setCategorias(cats);
+    setCategorias(normalizeTipoParaEdicion(tipo));
+    setEditingItem(false);
+    setItemToEdit(null);
     setMessage("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -420,6 +484,79 @@ export default function TiposInventario() {
   const handleCancelEdit = () => {
     resetForm();
     setMessage("");
+  };
+
+  const openItemEditor = (item, categoryId) => {
+    setItemToEdit({ item, categoryId, tipoId: null });
+    setEditingItem(true);
+  };
+
+  const openItemFromList = (tipo, cat, item) => {
+    const itemRef = getItemReferenceId(item) || item.id;
+    setItemToEdit({ item, categoryNombre: cat.nombre, itemRef, tipoId: tipo.id });
+    setEditingItem(true);
+  };
+
+  const handleSaveItemEdit = async (updatedItem) => {
+    if (!itemToEdit) return;
+
+    if (itemToEdit.tipoId) {
+      // Edición rápida de un producto individual desde la lista de tipos guardados:
+      // se guarda directo contra el backend, sin pasar por el formulario de arriba.
+      const tipo = tipos.find((t) => t.id === itemToEdit.tipoId);
+      if (!tipo) {
+        setEditingItem(false);
+        setItemToEdit(null);
+        return;
+      }
+
+      const nextCategorias = (tipo.categorias || []).map((cat) => {
+        if (cat.nombre !== itemToEdit.categoryNombre) return cat;
+        return {
+          ...cat,
+          items: (cat.items || []).map((it) => {
+            const ref = getItemReferenceId(it) || it.id;
+            if (ref !== itemToEdit.itemRef) return it;
+            return { ...it, ...updatedItem, id: it.id };
+          }),
+        };
+      });
+
+      try {
+        await actualizarTipoInventario(tipo.id, tipo.nombre, nextCategorias);
+        await loadTipos(tiendaId);
+        setMessage("Producto actualizado.");
+      } catch (error) {
+        console.error(error);
+        setMessage("Error al actualizar el producto.");
+      } finally {
+        setEditingItem(false);
+        setItemToEdit(null);
+      }
+      return;
+    }
+
+    setCategorias((current) =>
+      current.map((cat) => {
+        if (cat.id !== itemToEdit.categoryId) return cat;
+        return {
+          ...cat,
+          items: cat.items.map((item) => {
+            if (item.id !== itemToEdit.item.id) return item;
+            const nextItem = {
+              ...item,
+              ...updatedItem,
+              id: item.id,
+            };
+            return nextItem;
+          }),
+        };
+      })
+    );
+
+    setEditingItem(false);
+    setItemToEdit(null);
+    setMessage("Item actualizado.");
   };
 
   const handleDeleteTipo = async (tipo) => {
@@ -492,6 +629,13 @@ export default function TiposInventario() {
           <p className="warning"><AlertIcon /> Solo el gerente puede crear o editar tipos de inventario.</p>
         )}
 
+        {editingTipoId && (
+          <p className="edit-hint">
+            <InfoIcon /> En edición solo puedes cambiar el nombre del tipo de inventario. Para editar un producto,
+            usa el botón de editar junto al item en la lista de tipos guardados.
+          </p>
+        )}
+
         <div className="field-group">
           <label>Nombre del tipo de inventario</label>
           <input
@@ -502,6 +646,7 @@ export default function TiposInventario() {
           />
         </div>
 
+        {!editingTipoId && (
         <div className="field-group excel-import">
           <label>Importar desde Excel</label>
           <div className="excel-import-controls">
@@ -527,8 +672,9 @@ export default function TiposInventario() {
           </div>
           <small><InfoIcon /> Columna A = Nombre del item, Columna B = Categoría, Columna C = Unidad de medida</small>
         </div>
+        )}
 
-        {categorias.map((categoria, catIndex) => (
+        {!editingTipoId && categorias.map((categoria, catIndex) => (
           <div className="category-card" key={categoria.id}>
             <div className="category-header">
               <div>
@@ -604,16 +750,26 @@ export default function TiposInventario() {
                         : "Se guardará como unidades simples."}
                     </small>
                   </div>
-                  {categoria.items.length > 1 && isGerente() && (
-                    <div className="item-row-remove">
+                  {isGerente() && (
+                    <div className="item-row-actions">
                       <button
-                        className="icon-btn danger ghost"
-                        onClick={() => removeItem(categoria.id, item.id)}
+                        className="icon-btn secondary"
+                        onClick={() => openItemEditor(item, categoria.id)}
                         type="button"
-                        title="Quitar item"
+                        title="Editar item"
                       >
-                        <XIcon />
+                        <EditIcon />
                       </button>
+                      {categoria.items.length > 1 && (
+                        <button
+                          className="icon-btn danger ghost"
+                          onClick={() => removeItem(categoria.id, item.id)}
+                          type="button"
+                          title="Quitar item"
+                        >
+                          <XIcon />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -634,9 +790,11 @@ export default function TiposInventario() {
 
         {isGerente() && (
           <div className="form-actions">
-            <button className="btn secondary" type="button" onClick={addCategory}>
-              <PlusIcon /> Agregar categoría
-            </button>
+            {!editingTipoId && (
+              <button className="btn secondary" type="button" onClick={addCategory}>
+                <PlusIcon /> Agregar categoría
+              </button>
+            )}
             {editingTipoId && (
               <button className="btn ghost" type="button" onClick={handleCancelEdit}>
                 <XIcon /> Cancelar edición
@@ -650,6 +808,16 @@ export default function TiposInventario() {
 
         {message && <p className="message"><CheckCircleIcon /> {message}</p>}
       </section>
+
+      <EditarItemModal
+        open={editingItem}
+        item={itemToEdit?.item || null}
+        onClose={() => {
+          setEditingItem(false);
+          setItemToEdit(null);
+        }}
+        onSave={handleSaveItemEdit}
+      />
 
       <section className="tipos-list">
         <h3>Tipos de inventario existentes</h3>
@@ -671,6 +839,13 @@ export default function TiposInventario() {
                 </div>
                 {isGerente() && (
                   <div className="tipo-card-actions">
+                    <button
+                      className="btn ghost small"
+                      type="button"
+                      onClick={() => handleDownloadInventory(tipo)}
+                    >
+                      <DownloadIcon /> Descargar
+                    </button>
                     <button
                       className="btn secondary small"
                       type="button"
@@ -703,6 +878,16 @@ export default function TiposInventario() {
                             <span className={`item-tipo-chip ${esPaquete ? "paquete" : "unidad"}`}>
                               {esPaquete ? `paquete · ${item.equivalenciaUnidades || 1}u` : "unidad"}
                             </span>
+                            {isGerente() && (
+                              <button
+                                className="item-edit-btn"
+                                type="button"
+                                onClick={() => openItemFromList(tipo, cat, item)}
+                                title="Editar producto"
+                              >
+                                <EditIcon />
+                              </button>
+                            )}
                           </span>
                         </li>
                       );
