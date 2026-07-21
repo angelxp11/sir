@@ -32,3 +32,28 @@ export function convertToUnits(value, item = {}, selectedMode = null) {
 
   return parsed;
 }
+
+export function convertValueBetweenModes(value, item = {}, currentMode = null, targetMode = null) {
+  const normalizedItem = normalizeItemConfig(item);
+  const fromMode = normalizeMeasurementMode(currentMode, normalizedItem.tipoUnidad);
+  const toMode = normalizeMeasurementMode(targetMode, normalizedItem.tipoUnidad);
+  const cleanValue = String(value ?? "").trim();
+
+  if (!cleanValue) return "";
+
+  const parsed = Number(cleanValue.replace(/,/g, "."));
+  if (!Number.isFinite(parsed)) return "";
+
+  if (fromMode === toMode) return cleanValue;
+
+  if (fromMode === "paquete" && toMode === "unidad") {
+    return String(parsed * normalizedItem.equivalenciaUnidades);
+  }
+
+  if (fromMode === "unidad" && toMode === "paquete") {
+    const converted = parsed / normalizedItem.equivalenciaUnidades;
+    return Number.isInteger(converted) ? String(converted) : String(converted.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1"));
+  }
+
+  return cleanValue;
+}

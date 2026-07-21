@@ -9,7 +9,7 @@ import {
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
 import { buildInventarioPayload, buildItemDetailsMap, getItemDetailState } from "./inventariosguardadosUtils";
-import { convertToUnits, normalizeItemConfig } from "../../utils/inventarioConversion";
+import { convertToUnits, convertValueBetweenModes, normalizeItemConfig } from "../../utils/inventarioConversion";
 
 const getKey = (categoriaNombre, itemNombre) => `${categoriaNombre}||${itemNombre}`;
 
@@ -179,6 +179,19 @@ export default function InventariosGuardados() {
     setItemDetails((current) => ({
       ...current,
       [key]: { ...current[key], [field]: value },
+    }));
+  };
+
+  const handleModeChange = (key, modeField, valueField, itemConfig, currentMode, nextMode, currentValue) => {
+    const convertedValue = convertValueBetweenModes(currentValue, itemConfig, currentMode, nextMode);
+
+    setItemDetails((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        [modeField]: nextMode,
+        [valueField]: convertedValue,
+      },
     }));
   };
 
@@ -366,7 +379,15 @@ export default function InventariosGuardados() {
                                   type="checkbox"
                                   checked={bodegaMode === "paquete"}
                                   onChange={(event) =>
-                                    handleDetailChange(key, "bodegaModoRegistro", event.target.checked ? "paquete" : "unidad")
+                                    handleModeChange(
+                                      key,
+                                      "bodegaModoRegistro",
+                                      "bodega",
+                                      normalizedItem,
+                                      bodegaMode,
+                                      event.target.checked ? "paquete" : "unidad",
+                                      detail.bodega || ""
+                                    )
                                   }
                                 />
                                 <span className="toggle-slider" />
@@ -401,7 +422,15 @@ export default function InventariosGuardados() {
                                   type="checkbox"
                                   checked={lineaMode === "paquete"}
                                   onChange={(event) =>
-                                    handleDetailChange(key, "lineaModoRegistro", event.target.checked ? "paquete" : "unidad")
+                                    handleModeChange(
+                                      key,
+                                      "lineaModoRegistro",
+                                      "linea",
+                                      normalizedItem,
+                                      lineaMode,
+                                      event.target.checked ? "paquete" : "unidad",
+                                      detail.linea || ""
+                                    )
                                   }
                                 />
                                 <span className="toggle-slider" />

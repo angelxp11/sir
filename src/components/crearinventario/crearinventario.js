@@ -8,7 +8,7 @@ import {
   crearInventarioDesdeTipo,
 } from "../../server/funtions";
 import { showToast } from "../../resources/toastcontainer/ToastContainer";
-import { convertToUnits, normalizeItemConfig } from "../../utils/inventarioConversion";
+import { convertToUnits, convertValueBetweenModes, normalizeItemConfig } from "../../utils/inventarioConversion";
 
 const DRAFT_STORAGE_KEY = "sir_crear_inventario_draft";
 
@@ -95,6 +95,19 @@ export default function CrearInventario() {
       [key]: {
         ...(current[key] || {}),
         [field]: value,
+      },
+    }));
+  };
+
+  const handleModeChange = (key, modeField, valueField, itemConfig, currentMode, nextMode, currentValue) => {
+    const convertedValue = convertValueBetweenModes(currentValue, itemConfig, currentMode, nextMode);
+
+    setItemDetails((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        [modeField]: nextMode,
+        [valueField]: convertedValue,
       },
     }));
   };
@@ -395,7 +408,15 @@ export default function CrearInventario() {
                                   <input
                                     type="checkbox"
                                     checked={bodegaMode === "paquete"}
-                                    onChange={(e) => handleDetailChange(key, "bodegaModoRegistro", e.target.checked ? "paquete" : "unidad")}
+                                    onChange={(e) => handleModeChange(
+                                      key,
+                                      "bodegaModoRegistro",
+                                      "bodega",
+                                      normalizedItem,
+                                      bodegaMode,
+                                      e.target.checked ? "paquete" : "unidad",
+                                      detail.bodega || ""
+                                    )}
                                   />
                                   <span className="toggle-slider" />
                                   <span className="toggle-label">{bodegaMode === "paquete" ? "Paquete" : "Unidad"}</span>
@@ -430,7 +451,15 @@ export default function CrearInventario() {
                                   <input
                                     type="checkbox"
                                     checked={lineaMode === "paquete"}
-                                    onChange={(e) => handleDetailChange(key, "lineaModoRegistro", e.target.checked ? "paquete" : "unidad")}
+                                    onChange={(e) => handleModeChange(
+                                      key,
+                                      "lineaModoRegistro",
+                                      "linea",
+                                      normalizedItem,
+                                      lineaMode,
+                                      e.target.checked ? "paquete" : "unidad",
+                                      detail.linea || ""
+                                    )}
                                   />
                                   <span className="toggle-slider" />
                                   <span className="toggle-label">{lineaMode === "paquete" ? "Paquete" : "Unidad"}</span>

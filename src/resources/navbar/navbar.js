@@ -25,10 +25,8 @@ const NAV_ITEMS = [
 const Navbar = ({ onLogout, usuario, onNavigate, activeView }) => {
   const displayName = usuario?.nombre || usuario?.displayName || usuario?.correo || "usuario";
 
-  // En pantallas pequeñas arranca contraído para no robarle espacio al contenido.
-  const [isCollapsed, setIsCollapsed] = useState(
-    typeof window !== 'undefined' && window.innerWidth <= 768
-  );
+  // El navbar inicia oculto y se cierra al entrar a cualquier sección.
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const toggleCollapse = () => setIsCollapsed((prev) => !prev);
 
@@ -42,11 +40,8 @@ const Navbar = ({ onLogout, usuario, onNavigate, activeView }) => {
   const handleNav = (e, view) => {
     e.preventDefault();
     if (onNavigate) onNavigate(view);
-    // En móvil el sidebar se despliega sobre el contenido, así que
-    // al elegir una opción lo volvemos a contraer.
-    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-      setIsCollapsed(true);
-    }
+    // Al elegir una opción se vuelve a ocultar el navbar.
+    setIsCollapsed(true);
   };
 
   return (
